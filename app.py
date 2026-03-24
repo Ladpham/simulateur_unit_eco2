@@ -3,750 +3,637 @@ import pandas as pd
 import altair as alt
 from datetime import date
 
-# ==========================================================
+# --------------------------------------------------
 # CONFIG
-# ==========================================================
-st.set_page_config(page_title="Waribei – CM1 / CM2 / Break-even", layout="wide")
+# --------------------------------------------------
+st.set_page_config(page_title="Waribei – Unit Economics", layout="wide")
+DUREE_PERIODE_LIQUIDITE_JOURS = 10
 
-# ----------------------------------------------------------
-# DEFAULTS / PRESETS
-# ----------------------------------------------------------
-DEFAULT_DATE = date(2026, 6, 1)
-HISTORY_DATES = [date(2025, 6, 1), date(2025, 12, 1), date(2026, 6, 1)]
-
+# --------------------------------------------------
+# PRESETS (historique + défaut)
+# --------------------------------------------------
 PRESETS_BY_DATE = {
     date(2025, 6, 1): {
         "name": "Historique – Jun 2025",
         "revenu_pct": 3.73,
         "cout_paiement_pct": 1.75,
         "cout_liquidite_10j_pct": 0.21,
-        "expected_loss_pct": 1.43,
-        "cost_of_service_pct": 0.65,
+        "defaut_30j_pct": 1.43,
         "loan_book_k": 140.0,
         "cycles_per_month": 2.9,
-        "sales_marketing_opex_monthly": 2240.0,
-        "it_product_opex_monthly": 3630.0,
-        "ga_opex_monthly": 5820.0,
+        "fixed_opex_monthly": 14000.0,
     },
     date(2025, 12, 1): {
         "name": "Historique – Dec 2025",
         "revenu_pct": 3.76,
         "cout_paiement_pct": 1.80,
         "cout_liquidite_10j_pct": 0.36,
-        "expected_loss_pct": 1.00,
-        "cost_of_service_pct": 0.55,
+        "defaut_30j_pct": 1.00,
         "loan_book_k": 155.0,
         "cycles_per_month": 2.9,
-        "sales_marketing_opex_monthly": 2526.0,
-        "it_product_opex_monthly": 4000.0,
-        "ga_opex_monthly": 6500.0,
+        "fixed_opex_monthly": 14000.0,
     },
     date(2026, 6, 1): {
-        "name": "Base – Jun 2026",
+        "name": "Default – Jun 2026",
         "revenu_pct": 3.80,
         "cout_paiement_pct": 1.20,
         "cout_liquidite_10j_pct": 0.40,
-        "expected_loss_pct": 1.00,
-        "cost_of_service_pct": 0.45,
+        "defaut_30j_pct": 1.00,
         "loan_book_k": 320.0,
         "cycles_per_month": 2.9,
-        "sales_marketing_opex_monthly": 3500.0,
-        "it_product_opex_monthly": 4200.0,
-        "ga_opex_monthly": 7000.0,
+        "fixed_opex_monthly": 14000.0,
     },
 }
+DEFAULT_DATE = date(2026, 6, 1)
+HISTORY_DATES = [date(2025, 6, 1), date(2025, 12, 1), date(2026, 6, 1)]
 
+# --------------------------------------------------
+# SCÉNARIOS RAPIDES
+# --------------------------------------------------
 SCENARIOS_PRESETS = {
     "Custom": None,
     "Base scénario — Aujourd’hui": {
         "revenu_pct": 3.80,
         "cout_paiement_pct": 1.60,
         "cout_liquidite_10j_pct": 0.40,
-        "expected_loss_pct": 1.00,
-        "cost_of_service_pct": 0.52,
+        "defaut_30j_pct": 1.00,
         "loan_book_k": 225.0,
         "cycles_per_month": 2.9,
-        "sales_marketing_opex_monthly": 3600.0,
-        "it_product_opex_monthly": 4100.0,
-        "ga_opex_monthly": 6900.0,
+        "fixed_opex_monthly": 14000.0,
         "scenario_name_autofill": "Base scénario — Aujourd’hui",
     },
     "Scénario 1 — Optimisation légère": {
         "revenu_pct": 3.80,
         "cout_paiement_pct": 1.20,
         "cout_liquidite_10j_pct": 0.40,
-        "expected_loss_pct": 0.90,
-        "cost_of_service_pct": 0.45,
+        "defaut_30j_pct": 1.00,
         "loan_book_k": 320.0,
         "cycles_per_month": 2.9,
-        "sales_marketing_opex_monthly": 3600.0,
-        "it_product_opex_monthly": 4100.0,
-        "ga_opex_monthly": 6900.0,
+        "fixed_opex_monthly": 14000.0,
         "scenario_name_autofill": "Scénario 1 — Optimisation légère",
     },
     "Scénario 2 — Open Banking": {
         "revenu_pct": 3.80,
         "cout_paiement_pct": 0.50,
         "cout_liquidite_10j_pct": 0.40,
-        "expected_loss_pct": 0.62,
-        "cost_of_service_pct": 0.40,
-        "loan_book_k": 320.0,
+        "defaut_30j_pct": 0.62,
+        "loan_book_k": 280.0,
         "cycles_per_month": 3.0,
-        "sales_marketing_opex_monthly": 3400.0,
-        "it_product_opex_monthly": 4100.0,
-        "ga_opex_monthly": 6900.0,
+        "fixed_opex_monthly": 14000.0,
         "scenario_name_autofill": "Scénario 2 — Open Banking",
     },
     "Scénario 3 — Scale disciplinée": {
         "revenu_pct": 3.80,
         "cout_paiement_pct": 1.00,
         "cout_liquidite_10j_pct": 0.40,
-        "expected_loss_pct": 0.80,
-        "cost_of_service_pct": 0.40,
+        "defaut_30j_pct": 0.80,
         "loan_book_k": 500.0,
         "cycles_per_month": 3.0,
-        "sales_marketing_opex_monthly": 4500.0,
-        "it_product_opex_monthly": 4500.0,
-        "ga_opex_monthly": 7400.0,
+        "fixed_opex_monthly": 14000.0,
         "scenario_name_autofill": "Scénario 3 — Scale disciplinée",
     },
 }
 
-# ----------------------------------------------------------
-# STYLE
-# ----------------------------------------------------------
+# --------------------------------------------------
+# SESSION STATE INIT
+# --------------------------------------------------
+def init_state():
+    if "scenario_date" not in st.session_state:
+        st.session_state["scenario_date"] = DEFAULT_DATE
+
+    if "scenarios" not in st.session_state:
+        st.session_state["scenarios"] = [
+            {
+                "date": date(2025, 6, 1),
+                "name": "Historique – Jun 2025",
+                "cm1_pct": 3.73 - 1.75 - 0.21,
+                "cm2_pct": 3.73 - 1.75 - 0.21 - 1.43,
+                "contribution_margin_pct": 3.73 - 1.75 - 0.21 - 1.43,
+                "break_even_gap_eur": None,
+            },
+            {
+                "date": date(2025, 12, 1),
+                "name": "Historique – Dec 2025",
+                "cm1_pct": 3.76 - 1.80 - 0.36,
+                "cm2_pct": 3.76 - 1.80 - 0.36 - 1.00,
+                "contribution_margin_pct": 3.76 - 1.80 - 0.36 - 1.00,
+                "break_even_gap_eur": None,
+            },
+            {
+                "date": date(2026, 6, 1),
+                "name": "Default – Jun 2026",
+                "cm1_pct": 3.80 - 1.20 - 0.40,
+                "cm2_pct": 3.80 - 1.20 - 0.40 - 1.00,
+                "contribution_margin_pct": 3.80 - 1.20 - 0.40 - 1.00,
+                "break_even_gap_eur": None,
+            },
+        ]
+
+    if "pending_scenario" not in st.session_state:
+        st.session_state["pending_scenario"] = None
+
+init_state()
+
+# --------------------------------------------------
+# HELPERS
+# --------------------------------------------------
+def euro(x):
+    return f"{x:,.0f} €".replace(",", " ")
+
+def pct(x):
+    return f"{x:.2f}%"
+
+def safe_div(a, b):
+    return a / b if b not in [0, None] else 0.0
+
+def apply_preset_for_date(d, force=True):
+    preset = PRESETS_BY_DATE.get(d)
+    if not preset:
+        return
+
+    for key, val in preset.items():
+        state_key = key
+        if force or state_key not in st.session_state:
+            st.session_state[state_key] = val
+
+def apply_scenario_preset(name):
+    preset = SCENARIOS_PRESETS.get(name)
+    if not preset:
+        return
+    for key, val in preset.items():
+        st.session_state[key] = val
+
+def vbar_widget(label, key, min_value, max_value, step, help_text="", kind="neutral"):
+    value = float(st.session_state.get(key, min_value))
+    st.metric(label, pct(value))
+    st.slider(
+        label="",
+        min_value=float(min_value),
+        max_value=float(max_value),
+        value=float(value),
+        step=float(step),
+        key=key,
+        help=help_text,
+    )
+
+def knob_simple_visual(label, value, min_value, max_value):
+    st.markdown(f"**{label}**")
+    st.metric("", f"{value:.1f}")
+
+def make_waterfall_df_cm2(revenue, pay_cost, liq_cost, default_cost, margin):
+    steps = ["Revenu", "Coût paiement", "Coût liquidité (10j)", "Défaut 30j", "CM2"]
+    values = [revenue, -pay_cost, -liq_cost, -default_cost, margin]
+
+    start, end = [], []
+    running = 0.0
+    for v in values[:-1]:
+        start.append(running)
+        running += v
+        end.append(running)
+
+    start.append(0.0)
+    end.append(margin)
+
+    types = []
+    for i, v in enumerate(values):
+        if i == len(values) - 1:
+            types.append("total")
+        elif v >= 0:
+            types.append("positive")
+        else:
+            types.append("negative")
+
+    return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
+
+def make_waterfall_df_full(revenue, pay_cost, liq_cost, default_cost, cm1, fixed_opex_pct, break_even_pct):
+    steps = [
+        "Revenu",
+        "Coût paiement",
+        "Coût liquidité (10j)",
+        "CM1",
+        "Défaut 30j",
+        "CM2",
+        "OPEX fixes",
+        "Break-even",
+    ]
+    values = [
+        revenue,
+        -pay_cost,
+        -liq_cost,
+        cm1,
+        -default_cost,
+        cm1 - default_cost,
+        -fixed_opex_pct,
+        break_even_pct,
+    ]
+
+    start, end = [], []
+    running = 0.0
+    total_steps = {"CM1", "CM2", "Break-even"}
+
+    for step, val in zip(steps, values):
+        if step in total_steps:
+            start.append(0.0)
+            end.append(val)
+        else:
+            start.append(running)
+            running += val
+            end.append(running)
+
+    types = []
+    for step, val in zip(steps, values):
+        if step in total_steps:
+            types.append("total")
+        elif val >= 0:
+            types.append("positive")
+        else:
+            types.append("negative")
+
+    return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
+
+# --------------------------------------------------
+# STYLES
+# --------------------------------------------------
 st.markdown(
     """
     <style>
-    .metric-card {
-        padding: 14px 16px;
+    .wb-card {
         border: 1px solid rgba(0,0,0,0.08);
-        border-radius: 16px;
+        border-radius: 18px;
+        padding: 18px 18px 10px 18px;
         background: white;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.04);
-        min-height: 105px;
-    }
-    .metric-label {
-        font-size: 13px;
-        color: rgba(0,0,0,0.65);
-        margin-bottom: 8px;
-    }
-    .metric-value {
-        font-size: 28px;
-        font-weight: 800;
-        line-height: 1.05;
-        color: #064C72;
-    }
-    .metric-sub {
-        margin-top: 8px;
-        font-size: 12px;
-        color: rgba(0,0,0,0.58);
-    }
-    .section-note {
-        font-size: 13px;
-        color: rgba(0,0,0,0.68);
-        margin-top: -4px;
-        margin-bottom: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.03);
     }
     </style>
     """,
     unsafe_allow_html=True,
 )
 
-# ----------------------------------------------------------
-# HELPERS
-# ----------------------------------------------------------
-def euro(x):
-    return f"€{x:,.0f}".replace(",", " ")
+# --------------------------------------------------
+# NAVIGATION
+# --------------------------------------------------
+page = st.sidebar.radio("Navigation", ["Simulateur", "Comment je modélise une courbe ?"])
 
-def euro1(x):
-    return f"€{x:,.1f}".replace(",", " ")
-
-def pct(x):
-    return f"{x:.2f}%"
-
-def safe_div(a, b):
-    return a / b if b else 0.0
-
-def metric_card(label, value, sub=""):
+# ==================================================
+# PAGE 2
+# ==================================================
+if page == "Comment je modélise une courbe ?":
+    st.title("Comment fonctionne le simulateur Waribei ?")
     st.markdown(
-        f"""
-        <div class="metric-card">
-            <div class="metric-label">{label}</div>
-            <div class="metric-value">{value}</div>
-            <div class="metric-sub">{sub}</div>
-        </div>
-        """,
-        unsafe_allow_html=True,
+        """
+- Historique : **Jun 2025**, **Dec 2025**, **Jun 2026**
+- **CM1** = revenu - coût paiement - coût liquidité
+- **CM2** = CM1 - défaut 30j
+- **Break-even** = contribution mensuelle - OPEX fixes
+- Courbe historique : **CM1** et **CM2**
+"""
     )
 
-def init_state():
-    if "scenario_date" not in st.session_state:
-        st.session_state["scenario_date"] = DEFAULT_DATE
+# ==================================================
+# PAGE 1
+# ==================================================
+else:
+    top = st.columns([0.7, 0.3])
+    with top[0]:
+        st.title("Unit Economics – Waribei")
+    with top[1]:
+        try:
+            st.image("logo_waribei_icon@2x.png", width=100)
+        except Exception:
+            st.write("Logo Waribei")
 
-    if "saved_scenarios" not in st.session_state:
-        st.session_state["saved_scenarios"] = [
-            {"date": date(2025, 6, 1), "name": "Historique – Jun 2025"},
-            {"date": date(2025, 12, 1), "name": "Historique – Dec 2025"},
-            {"date": date(2026, 6, 1), "name": "Base – Jun 2026"},
-        ]
+    st.markdown("---")
 
-def apply_preset_for_date(d):
-    preset = PRESETS_BY_DATE.get(d)
-    if preset:
-        for k, v in preset.items():
-            st.session_state[f"in_{k}"] = v
+    # --------------------------------------------------
+    # APPLY PENDING SCENARIO
+    # --------------------------------------------------
+    if "pending_scenario" in st.session_state and st.session_state.pending_scenario:
+        apply_scenario_preset(st.session_state.pending_scenario)
+        st.session_state.pending_scenario = None
 
-def apply_scenario_preset(name):
-    cfg = SCENARIOS_PRESETS.get(name)
-    if cfg:
-        for k, v in cfg.items():
-            st.session_state[f"in_{k}"] = v
+    # --------------------------------------------------
+    # SIDEBAR CONTROLS
+    # --------------------------------------------------
+    with st.sidebar:
+        st.markdown("### Presets rapides")
+        selected_preset = st.selectbox("Scénario rapide", list(SCENARIOS_PRESETS.keys()))
+        if selected_preset != "Custom":
+            if st.button("Appliquer le preset"):
+                apply_scenario_preset(selected_preset)
 
-def compute_model(
-    revenu_pct,
-    cout_paiement_pct,
-    cout_liquidite_10j_pct,
-    expected_loss_pct,
-    cost_of_service_pct,
-    loan_book_k,
-    cycles_per_month,
-    sales_marketing_opex_monthly,
-    it_product_opex_monthly,
-    ga_opex_monthly,
-    sales_marketing_variable_ratio,
-    it_product_variable_ratio,
-    ga_variable_ratio,
-):
-    # Volume
-    loan_book_eur = loan_book_k * 1000
-    monthly_tpv_eur = loan_book_eur * cycles_per_month
+        st.markdown("---")
+        dcols = st.columns([0.72, 0.28])
+        with dcols[1]:
+            if st.button("Today"):
+                st.session_state["scenario_date"] = DEFAULT_DATE
+                apply_preset_for_date(DEFAULT_DATE, force=True)
+        with dcols[0]:
+            picked = st.date_input("Date", value=st.session_state.get("scenario_date", DEFAULT_DATE))
+            st.session_state["scenario_date"] = picked
+        apply_preset_for_date(st.session_state["scenario_date"], force=False)
 
-    # Revenue & direct costs
-    monthly_revenue_eur = monthly_tpv_eur * revenu_pct / 100
-    monthly_payment_cost_eur = monthly_tpv_eur * cout_paiement_pct / 100
-    monthly_liquidity_cost_eur = monthly_tpv_eur * cout_liquidite_10j_pct / 100
+        default_label = st.session_state.get("scenario_name_autofill", "Scenario")
+        scenario_name = st.text_input("Label du scénario", value=default_label)
 
-    # CM1
-    cm1_eur = monthly_revenue_eur - monthly_payment_cost_eur - monthly_liquidity_cost_eur
-    cm1_pct = safe_div(cm1_eur, monthly_tpv_eur) * 100
+    # --------------------------------------------------
+    # MAIN LAYOUT
+    # --------------------------------------------------
+    main_left, main_right = st.columns([0.68, 0.32], gap="large")
 
-    # Variable operating load
-    monthly_cost_of_service_eur = monthly_tpv_eur * cost_of_service_pct / 100
-    monthly_expected_loss_eur = monthly_tpv_eur * expected_loss_pct / 100
+    # =========================
+    # LEFT
+    # =========================
+    with main_left:
+        # ---- Hypothèses par transaction
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Hypothèses par transaction")
 
-    sales_marketing_variable = sales_marketing_opex_monthly * sales_marketing_variable_ratio
-    sales_marketing_fixed = sales_marketing_opex_monthly * (1 - sales_marketing_variable_ratio)
+        c1, c2, c3, c4 = st.columns(4, gap="large")
+        with c1:
+            vbar_widget("Revenus / trx", "revenu_pct", 1.0, 5.0, 0.01, "Take-rate / commission moyenne.")
+        with c2:
+            vbar_widget("Coût paiement / trx", "cout_paiement_pct", 0.0, 2.5, 0.01, "Coût des rails de paiement.")
+        with c3:
+            vbar_widget("Coût liquidité (10j)", "cout_liquidite_10j_pct", 0.0, 1.5, 0.01, "Coût de financement sur 10 jours.")
+        with c4:
+            vbar_widget("Défaut 30j / trx", "defaut_30j_pct", 0.0, 5.0, 0.01, "Perte attendue nette à 30 jours.")
 
-    it_product_variable = it_product_opex_monthly * it_product_variable_ratio
-    it_product_fixed = it_product_opex_monthly * (1 - it_product_variable_ratio)
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("")
 
-    ga_variable = ga_opex_monthly * ga_variable_ratio
-    ga_fixed = ga_opex_monthly * (1 - ga_variable_ratio)
+        # ---- Variables de volume
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Variables de volume")
 
-    variable_opex_eur = sales_marketing_variable + it_product_variable + ga_variable
-    fixed_opex_eur = sales_marketing_fixed + it_product_fixed + ga_fixed
+        vcol1, vcol2 = st.columns([0.5, 0.5], gap="large")
+        with vcol1:
+            knob_simple_visual("Loan book moyen (k€)", float(st.session_state.get("loan_book_k", 320.0)), 50.0, 1000.0)
+            st.slider(
+                label="",
+                min_value=50.0,
+                max_value=1000.0,
+                value=float(st.session_state.get("loan_book_k", 320.0)),
+                step=5.0,
+                key="loan_book_k",
+            )
 
-    # CM2
-    cm2_eur = (
-        cm1_eur
-        - monthly_cost_of_service_eur
-        - monthly_expected_loss_eur
-        - variable_opex_eur
-    )
-    cm2_pct = safe_div(cm2_eur, monthly_tpv_eur) * 100
+        with vcol2:
+            knob_simple_visual("Cycles / mois", float(st.session_state.get("cycles_per_month", 2.9)), 1.0, 5.0)
+            st.slider(
+                label="",
+                min_value=1.0,
+                max_value=5.0,
+                value=float(st.session_state.get("cycles_per_month", 2.9)),
+                step=0.1,
+                key="cycles_per_month",
+            )
 
-    # Break-even contribution
-    break_even_contribution_eur = cm2_eur - fixed_opex_eur
-    opex_coverage_pct = safe_div(cm2_eur, fixed_opex_eur) * 100
-    net_operating_margin_pct = safe_div(break_even_contribution_eur, monthly_tpv_eur) * 100
+        st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("")
 
-    return {
-        "loan_book_eur": loan_book_eur,
-        "monthly_tpv_eur": monthly_tpv_eur,
-        "monthly_revenue_eur": monthly_revenue_eur,
-        "monthly_payment_cost_eur": monthly_payment_cost_eur,
-        "monthly_liquidity_cost_eur": monthly_liquidity_cost_eur,
-        "cm1_eur": cm1_eur,
-        "cm1_pct": cm1_pct,
-        "monthly_cost_of_service_eur": monthly_cost_of_service_eur,
-        "monthly_expected_loss_eur": monthly_expected_loss_eur,
-        "sales_marketing_variable": sales_marketing_variable,
-        "sales_marketing_fixed": sales_marketing_fixed,
-        "it_product_variable": it_product_variable,
-        "it_product_fixed": it_product_fixed,
-        "ga_variable": ga_variable,
-        "ga_fixed": ga_fixed,
-        "variable_opex_eur": variable_opex_eur,
-        "fixed_opex_eur": fixed_opex_eur,
-        "cm2_eur": cm2_eur,
-        "cm2_pct": cm2_pct,
-        "break_even_contribution_eur": break_even_contribution_eur,
-        "opex_coverage_pct": opex_coverage_pct,
-        "net_operating_margin_pct": net_operating_margin_pct,
-    }
+        # ---- OPEX fixe
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Structure fixe")
 
-def make_waterfall_df(m):
-    rows = [
-        ("Revenue", m["monthly_revenue_eur"]),
-        ("Payment fees", -m["monthly_payment_cost_eur"]),
-        ("Liquidity cost", -m["monthly_liquidity_cost_eur"]),
-        ("CM1", m["cm1_eur"]),
-        ("Cost of service", -m["monthly_cost_of_service_eur"]),
-        ("Expected losses", -m["monthly_expected_loss_eur"]),
-        ("Variable OPEX", -m["variable_opex_eur"]),
-        ("CM2", m["cm2_eur"]),
-        ("Fixed OPEX", -m["fixed_opex_eur"]),
-        ("Break-even contribution", m["break_even_contribution_eur"]),
-    ]
+        op1, op2 = st.columns([0.45, 0.55], gap="large")
+        with op1:
+            st.metric("OPEX fixes mensuels", euro(float(st.session_state.get("fixed_opex_monthly", 14000.0))))
+        with op2:
+            st.slider(
+                "OPEX fixes mensuels (€)",
+                min_value=0.0,
+                max_value=40000.0,
+                value=float(st.session_state.get("fixed_opex_monthly", 14000.0)),
+                step=500.0,
+                key="fixed_opex_monthly",
+                help="Coûts fixes à couvrir pour atteindre le break-even.",
+            )
 
-    df = pd.DataFrame(rows, columns=["step", "value"])
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    starts, ends, kinds = [], [], []
-    running = 0.0
-    total_steps = {"CM1", "CM2", "Break-even contribution"}
+    # =========================
+    # RIGHT
+    # =========================
+    with main_right:
+        revenu_pct = float(st.session_state["revenu_pct"])
+        cout_paiement_pct = float(st.session_state["cout_paiement_pct"])
+        cout_liquidite_10j_pct = float(st.session_state["cout_liquidite_10j_pct"])
+        defaut_30j_pct = float(st.session_state["defaut_30j_pct"])
+        loan_book_k = float(st.session_state["loan_book_k"])
+        cycles_per_month = float(st.session_state["cycles_per_month"])
+        fixed_opex_monthly = float(st.session_state["fixed_opex_monthly"])
 
-    for _, row in df.iterrows():
-        step = row["step"]
-        val = row["value"]
+        # Core calculations
+        cm1_pct = revenu_pct - cout_paiement_pct - cout_liquidite_10j_pct
+        cm2_pct = cm1_pct - defaut_30j_pct
+        contribution_margin_pct = cm2_pct
 
-        if step in total_steps:
-            starts.append(0.0)
-            ends.append(val)
-            kinds.append("total")
+        loan_book_eur = loan_book_k * 1000
+        monthly_tpv_eur = loan_book_eur * cycles_per_month
+        monthly_revenue_eur = monthly_tpv_eur * revenu_pct / 100
+        monthly_cm1_eur = monthly_tpv_eur * cm1_pct / 100
+        monthly_contribution_margin_eur = monthly_tpv_eur * contribution_margin_pct / 100
+        break_even_gap_eur = monthly_contribution_margin_eur - fixed_opex_monthly
+        fixed_opex_pct_of_tpv = safe_div(fixed_opex_monthly, monthly_tpv_eur) * 100
+        break_even_pct = contribution_margin_pct - fixed_opex_pct_of_tpv
+
+        # Revenue needed for break-even
+        cm2_rate = contribution_margin_pct / 100
+        mrr_needed_for_break_even = safe_div(fixed_opex_monthly, cm2_rate) if cm2_rate > 0 else None
+        tpv_needed_for_break_even = mrr_needed_for_break_even / (revenu_pct / 100) if revenu_pct > 0 and mrr_needed_for_break_even is not None else None
+
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Lecture business")
+
+        st.metric("CM1 (%)", pct(cm1_pct), help="Revenu - coût paiement - coût liquidité")
+        st.metric("CM2 (%)", pct(cm2_pct), help="CM1 - défaut 30j")
+        st.metric("Contribution mensuelle", euro(monthly_contribution_margin_eur))
+        st.metric("Break-even gap", euro(break_even_gap_eur))
+
+        if mrr_needed_for_break_even is not None:
+            st.metric("MRR requis pour break-even", euro(mrr_needed_for_break_even))
         else:
-            starts.append(running)
-            running += val
-            ends.append(running)
-            kinds.append("positive" if val >= 0 else "negative")
+            st.metric("MRR requis pour break-even", "N/A")
 
-    df["start"] = starts
-    df["end"] = ends
-    df["kind"] = kinds
-    return df
+        if tpv_needed_for_break_even is not None:
+            st.metric("TPV requis pour break-even", euro(tpv_needed_for_break_even))
+        else:
+            st.metric("TPV requis pour break-even", "N/A")
 
-def make_break_even_curve(base_inputs):
-    rows = []
-    for loan_book_k in range(100, 901, 25):
-        m = compute_model(
-            revenu_pct=base_inputs["revenu_pct"],
-            cout_paiement_pct=base_inputs["cout_paiement_pct"],
-            cout_liquidite_10j_pct=base_inputs["cout_liquidite_10j_pct"],
-            expected_loss_pct=base_inputs["expected_loss_pct"],
-            cost_of_service_pct=base_inputs["cost_of_service_pct"],
-            loan_book_k=loan_book_k,
-            cycles_per_month=base_inputs["cycles_per_month"],
-            sales_marketing_opex_monthly=base_inputs["sales_marketing_opex_monthly"],
-            it_product_opex_monthly=base_inputs["it_product_opex_monthly"],
-            ga_opex_monthly=base_inputs["ga_opex_monthly"],
-            sales_marketing_variable_ratio=base_inputs["sales_marketing_variable_ratio"],
-            it_product_variable_ratio=base_inputs["it_product_variable_ratio"],
-            ga_variable_ratio=base_inputs["ga_variable_ratio"],
-        )
-        rows.append(
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        st.markdown("")
+
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Tableau synthétique")
+
+        summary_df = pd.DataFrame(
             {
-                "loan_book_k": loan_book_k,
-                "tpv_eur": m["monthly_tpv_eur"],
-                "cm2_eur": m["cm2_eur"],
-                "fixed_opex_eur": m["fixed_opex_eur"],
-                "break_even_contribution_eur": m["break_even_contribution_eur"],
+                "Métrique": [
+                    "Revenue %",
+                    "Coût paiement %",
+                    "Coût liquidité %",
+                    "Défaut 30j %",
+                    "CM1 %",
+                    "CM2 %",
+                    "Loan book (€)",
+                    "TPV mensuel (€)",
+                    "Contribution mensuelle (€)",
+                    "OPEX fixes mensuels (€)",
+                    "Break-even gap (€)",
+                ],
+                "Valeur": [
+                    pct(revenu_pct),
+                    pct(cout_paiement_pct),
+                    pct(cout_liquidite_10j_pct),
+                    pct(defaut_30j_pct),
+                    pct(cm1_pct),
+                    pct(cm2_pct),
+                    euro(loan_book_eur),
+                    euro(monthly_tpv_eur),
+                    euro(monthly_contribution_margin_eur),
+                    euro(fixed_opex_monthly),
+                    euro(break_even_gap_eur),
+                ],
             }
         )
-    return pd.DataFrame(rows)
+        st.dataframe(summary_df, use_container_width=True, hide_index=True)
 
-# ----------------------------------------------------------
-# INIT
-# ----------------------------------------------------------
-init_state()
-apply_preset_for_date(st.session_state["scenario_date"])
+        if st.button("SAVE"):
+            d = st.session_state["scenario_date"]
+            record = {
+                "date": d,
+                "name": scenario_name,
+                "cm1_pct": cm1_pct,
+                "cm2_pct": cm2_pct,
+                "contribution_margin_pct": contribution_margin_pct,
+                "break_even_gap_eur": break_even_gap_eur,
+            }
 
-# ----------------------------------------------------------
-# HEADER
-# ----------------------------------------------------------
-st.title("Waribei – CM1 / CM2 / Break-even Dashboard")
-st.caption(
-    "Lecture recommandée : CM1 = moteur transactionnel, CM2 = croissance réellement contributive, Break-even contribution = CM2 après structure fixe."
-)
+            replaced = False
+            for i, s in enumerate(st.session_state.scenarios):
+                if s.get("date") == d:
+                    st.session_state.scenarios[i] = record
+                    replaced = True
+                    break
+            if not replaced:
+                st.session_state.scenarios.append(record)
 
-# ----------------------------------------------------------
-# SIDEBAR
-# ----------------------------------------------------------
-with st.sidebar:
-    st.header("Scénarios")
+            st.success(f"Scénario '{scenario_name}' sauvegardé ({d}).")
 
-    quick = st.selectbox("Preset rapide", list(SCENARIOS_PRESETS.keys()))
-    if quick != "Custom":
-        apply_scenario_preset(quick)
-
-    dcols = st.columns([0.7, 0.3])
-    with dcols[0]:
-        picked = st.date_input("Date", value=st.session_state["scenario_date"])
-        st.session_state["scenario_date"] = picked
-    with dcols[1]:
-        if st.button("Today"):
-            st.session_state["scenario_date"] = DEFAULT_DATE
-            apply_preset_for_date(DEFAULT_DATE)
+        st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
-    st.subheader("Inputs business")
 
-    revenu_pct = st.slider("Revenue % TPV", 0.0, 8.0, float(st.session_state.get("in_revenu_pct", 3.80)), 0.01)
-    cout_paiement_pct = st.slider("Payment cost % TPV", 0.0, 4.0, float(st.session_state.get("in_cout_paiement_pct", 1.20)), 0.01)
-    cout_liquidite_10j_pct = st.slider("Liquidity cost % TPV", 0.0, 3.0, float(st.session_state.get("in_cout_liquidite_10j_pct", 0.40)), 0.01)
-    expected_loss_pct = st.slider("Expected credit loss % TPV", 0.0, 5.0, float(st.session_state.get("in_expected_loss_pct", 1.00)), 0.01)
-    cost_of_service_pct = st.slider("Cost of service % TPV", 0.0, 3.0, float(st.session_state.get("in_cost_of_service_pct", 0.45)), 0.01)
-
-    loan_book_k = st.slider("Loan book (€k)", 50.0, 1000.0, float(st.session_state.get("in_loan_book_k", 320.0)), 5.0)
-    cycles_per_month = st.slider("Cycles / month", 1.0, 5.0, float(st.session_state.get("in_cycles_per_month", 2.9)), 0.1)
-
-    st.markdown("---")
-    st.subheader("OPEX mensuels (€)")
-
-    sales_marketing_opex_monthly = st.number_input(
-        "Sales & Marketing OPEX",
-        min_value=0.0,
-        value=float(st.session_state.get("in_sales_marketing_opex_monthly", 3500.0)),
-        step=100.0,
-    )
-    it_product_opex_monthly = st.number_input(
-        "IT & Product OPEX",
-        min_value=0.0,
-        value=float(st.session_state.get("in_it_product_opex_monthly", 4200.0)),
-        step=100.0,
-    )
-    ga_opex_monthly = st.number_input(
-        "G&A OPEX",
-        min_value=0.0,
-        value=float(st.session_state.get("in_ga_opex_monthly", 7000.0)),
-        step=100.0,
+    # --------------------------------------------------
+    # WATERFALL 1 : proche du dashboard existant
+    # --------------------------------------------------
+    st.markdown("### Décomposition par transaction (waterfall CM2)")
+    wf_df = make_waterfall_df_cm2(
+        revenu_pct,
+        cout_paiement_pct,
+        cout_liquidite_10j_pct,
+        defaut_30j_pct,
+        contribution_margin_pct,
     )
 
-    st.markdown("---")
-    st.subheader("Ratios de variabilisation")
-
-    sales_marketing_variable_ratio = st.slider("Part variable Sales & Marketing", 0.0, 1.0, 0.70, 0.05)
-    it_product_variable_ratio = st.slider("Part variable IT & Product", 0.0, 1.0, 0.10, 0.05)
-    ga_variable_ratio = st.slider("Part variable G&A", 0.0, 1.0, 0.05, 0.05)
-
-    st.markdown("---")
-    scenario_name = st.text_input("Label du scénario", value=SCENARIOS_PRESETS.get(quick, {}).get("scenario_name_autofill", "Custom scenario") if SCENARIOS_PRESETS.get(quick) else "Custom scenario")
-
-# ----------------------------------------------------------
-# MODEL
-# ----------------------------------------------------------
-base_inputs = {
-    "revenu_pct": revenu_pct,
-    "cout_paiement_pct": cout_paiement_pct,
-    "cout_liquidite_10j_pct": cout_liquidite_10j_pct,
-    "expected_loss_pct": expected_loss_pct,
-    "cost_of_service_pct": cost_of_service_pct,
-    "loan_book_k": loan_book_k,
-    "cycles_per_month": cycles_per_month,
-    "sales_marketing_opex_monthly": sales_marketing_opex_monthly,
-    "it_product_opex_monthly": it_product_opex_monthly,
-    "ga_opex_monthly": ga_opex_monthly,
-    "sales_marketing_variable_ratio": sales_marketing_variable_ratio,
-    "it_product_variable_ratio": it_product_variable_ratio,
-    "ga_variable_ratio": ga_variable_ratio,
-}
-
-m = compute_model(**base_inputs)
-
-# ----------------------------------------------------------
-# TOP KPIs
-# ----------------------------------------------------------
-st.markdown("## Vue synthétique")
-k1, k2, k3, k4, k5, k6 = st.columns(6)
-
-with k1:
-    metric_card("CM1 %", pct(m["cm1_pct"]), "Revenue – payment – liquidité")
-with k2:
-    metric_card("CM1 € / mois", euro(m["cm1_eur"]), f"sur {euro(m['monthly_tpv_eur'])} de TPV")
-with k3:
-    metric_card("CM2 %", pct(m["cm2_pct"]), "après service, risque et OPEX variables")
-with k4:
-    metric_card("CM2 € / mois", euro(m["cm2_eur"]), "contribution économique réelle")
-with k5:
-    metric_card("OPEX coverage", pct(m["opex_coverage_pct"]), "CM2 / OPEX fixes")
-with k6:
-    metric_card("Break-even contribution", euro(m["break_even_contribution_eur"]), "CM2 – OPEX fixes")
-
-st.markdown("## Lecture business")
-st.markdown(
-    """
-    <div class="section-note">
-    CM1 te dit si le moteur transactionnel est sain. CM2 te dit si ta croissance marginale crée de la valeur.
-    Break-even contribution te dit si la structure actuelle peut être absorbée.
-    </div>
-    """,
-    unsafe_allow_html=True,
-)
-
-# ----------------------------------------------------------
-# DETAIL TABLES
-# ----------------------------------------------------------
-c1, c2 = st.columns([0.52, 0.48])
-
-with c1:
-    st.markdown("### Unit economics (% du TPV)")
-    unit_df = pd.DataFrame(
-        [
-            ("Revenue", revenu_pct),
-            ("Payment fees", -cout_paiement_pct),
-            ("Liquidity cost", -cout_liquidite_10j_pct),
-            ("CM1", m["cm1_pct"]),
-            ("Cost of service", -cost_of_service_pct),
-            ("Expected losses", -expected_loss_pct),
-            ("Variable OPEX", -safe_div(m["variable_opex_eur"], m["monthly_tpv_eur"]) * 100),
-            ("CM2", m["cm2_pct"]),
-            ("Fixed OPEX", -safe_div(m["fixed_opex_eur"], m["monthly_tpv_eur"]) * 100),
-            ("Break-even contribution", m["net_operating_margin_pct"]),
-        ],
-        columns=["Line item", "% TPV"],
-    )
-    st.dataframe(unit_df.style.format({"% TPV": "{:.2f}%"}), use_container_width=True)
-
-with c2:
-    st.markdown("### Lecture mensuelle (€)")
-    monthly_df = pd.DataFrame(
-        [
-            ("Loan book", m["loan_book_eur"]),
-            ("TPV mensuel", m["monthly_tpv_eur"]),
-            ("Revenue", m["monthly_revenue_eur"]),
-            ("Payment fees", m["monthly_payment_cost_eur"]),
-            ("Liquidity cost", m["monthly_liquidity_cost_eur"]),
-            ("CM1", m["cm1_eur"]),
-            ("Cost of service", m["monthly_cost_of_service_eur"]),
-            ("Expected losses", m["monthly_expected_loss_eur"]),
-            ("Variable OPEX", m["variable_opex_eur"]),
-            ("CM2", m["cm2_eur"]),
-            ("Fixed OPEX", m["fixed_opex_eur"]),
-            ("Break-even contribution", m["break_even_contribution_eur"]),
-        ],
-        columns=["Line item", "€ / month"],
-    )
-    st.dataframe(monthly_df.style.format({"€ / month": "€{:,.0f}"}), use_container_width=True)
-
-# ----------------------------------------------------------
-# RECLASSIFICATION VIEW
-# ----------------------------------------------------------
-st.markdown("## Reclassification des coûts")
-r1, r2, r3 = st.columns(3)
-
-with r1:
-    st.markdown("### Variable pur")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                ("Cost of service", m["monthly_cost_of_service_eur"]),
-                ("Expected losses", m["monthly_expected_loss_eur"]),
-                ("S&M variable", m["sales_marketing_variable"]),
-                ("IT/Product variable", m["it_product_variable"]),
-                ("G&A variable", m["ga_variable"]),
-            ],
-            columns=["Item", "€/mois"],
-        ).style.format({"€/mois": "€{:,.0f}"}),
-        use_container_width=True,
-    )
-
-with r2:
-    st.markdown("### Fixe pur")
-    st.dataframe(
-        pd.DataFrame(
-            [
-                ("S&M fixe", m["sales_marketing_fixed"]),
-                ("IT/Product fixe", m["it_product_fixed"]),
-                ("G&A fixe", m["ga_fixed"]),
-            ],
-            columns=["Item", "€/mois"],
-        ).style.format({"€/mois": "€{:,.0f}"}),
-        use_container_width=True,
-    )
-
-with r3:
-    st.markdown("### Totaux")
-    reclass_totals = pd.DataFrame(
-        [
-            ("Variable OPEX total", m["variable_opex_eur"]),
-            ("Fixed OPEX total", m["fixed_opex_eur"]),
-            ("CM2", m["cm2_eur"]),
-            ("Break-even contribution", m["break_even_contribution_eur"]),
-        ],
-        columns=["Item", "€/mois"],
-    )
-    st.dataframe(reclass_totals.style.format({"€/mois": "€{:,.0f}"}), use_container_width=True)
-
-# ----------------------------------------------------------
-# WATERFALL
-# ----------------------------------------------------------
-st.markdown("## Waterfall économique")
-wf_df = make_waterfall_df(m)
-
-color_scale = alt.Scale(
-    domain=["positive", "negative", "total"],
-    range=["#1B5A43", "#F83131", "#064C72"],
-)
-
-waterfall_chart = (
-    alt.Chart(wf_df)
-    .mark_bar()
-    .encode(
-        x=alt.X("step:N", sort=list(wf_df["step"]), title=None),
-        y=alt.Y("start:Q", title="€"),
-        y2="end:Q",
-        color=alt.Color("kind:N", scale=color_scale, legend=None),
-        tooltip=[
-            alt.Tooltip("step:N", title="Step"),
-            alt.Tooltip("value:Q", title="Value", format=",.0f"),
-        ],
-    )
-)
-
-waterfall_labels = (
-    alt.Chart(wf_df)
-    .mark_text(dy=-6, color="#333", fontSize=11)
-    .encode(
-        x=alt.X("step:N", sort=list(wf_df["step"])),
-        y="end:Q",
-        text=alt.Text("value:Q", format=",.0f"),
-    )
-)
-
-st.altair_chart((waterfall_chart + waterfall_labels).properties(height=360), use_container_width=True)
-
-# ----------------------------------------------------------
-# BREAK-EVEN CURVE
-# ----------------------------------------------------------
-st.markdown("## Courbe de break-even")
-curve_df = make_break_even_curve(base_inputs)
-
-cm2_line = (
-    alt.Chart(curve_df)
-    .mark_line(point=False)
-    .encode(
-        x=alt.X("loan_book_k:Q", title="Loan book (€k)"),
-        y=alt.Y("cm2_eur:Q", title="€ / month"),
-        tooltip=[
-            alt.Tooltip("loan_book_k:Q", title="Loan book (€k)", format=".0f"),
-            alt.Tooltip("cm2_eur:Q", title="CM2", format=",.0f"),
-        ],
-    )
-)
-
-fixed_line = (
-    alt.Chart(curve_df)
-    .mark_line(strokeDash=[4, 4])
-    .encode(
-        x="loan_book_k:Q",
-        y="fixed_opex_eur:Q",
-        tooltip=[alt.Tooltip("fixed_opex_eur:Q", title="Fixed OPEX", format=",.0f")],
-    )
-)
-
-be_line = (
-    alt.Chart(curve_df)
-    .mark_line(color="#F59E0B")
-    .encode(
-        x="loan_book_k:Q",
-        y="break_even_contribution_eur:Q",
-        tooltip=[alt.Tooltip("break_even_contribution_eur:Q", title="Break-even contribution", format=",.0f")],
-    )
-)
-
-zero_rule = alt.Chart(pd.DataFrame({"y": [0]})).mark_rule(color="gray").encode(y="y:Q")
-
-st.altair_chart((cm2_line + fixed_line + be_line + zero_rule).properties(height=340), use_container_width=True)
-
-# ----------------------------------------------------------
-# SCENARIO SAVE / HISTORY
-# ----------------------------------------------------------
-st.markdown("## Historique de scénarios")
-
-save_col1, save_col2 = st.columns([0.25, 0.75])
-with save_col1:
-    if st.button("SAVE current scenario"):
-        d = st.session_state["scenario_date"]
-        record = {
-            "date": d,
-            "name": scenario_name,
-            "cm1_pct": m["cm1_pct"],
-            "cm2_pct": m["cm2_pct"],
-            "break_even_contribution_eur": m["break_even_contribution_eur"],
-            "loan_book_k": loan_book_k,
-        }
-
-        replaced = False
-        for i, s in enumerate(st.session_state["saved_scenarios"]):
-            if s.get("date") == d:
-                st.session_state["saved_scenarios"][i] = record
-                replaced = True
-                break
-        if not replaced:
-            st.session_state["saved_scenarios"].append(record)
-
-        st.success(f"Scenario saved for {d}")
-
-hist_df = pd.DataFrame(st.session_state["saved_scenarios"])
-if not hist_df.empty:
-    if "cm1_pct" not in hist_df.columns:
-        hist_df["cm1_pct"] = None
-    if "cm2_pct" not in hist_df.columns:
-        hist_df["cm2_pct"] = None
-    if "break_even_contribution_eur" not in hist_df.columns:
-        hist_df["break_even_contribution_eur"] = None
-    if "loan_book_k" not in hist_df.columns:
-        hist_df["loan_book_k"] = None
-
-    hist_df = hist_df.sort_values("date").drop_duplicates(subset=["date"], keep="last")
-
-    hist_long = hist_df.melt(
-        id_vars=["date", "name"],
-        value_vars=["cm1_pct", "cm2_pct"],
-        var_name="metric",
-        value_name="value",
-    )
-
-    line = (
-        alt.Chart(hist_long.dropna())
-        .mark_line(point=True)
+    color_scale = alt.Scale(domain=["positive", "negative", "total"], range=["#1B5A43", "#F83131", "#064C72"])
+    waterfall_chart = (
+        alt.Chart(wf_df)
+        .mark_bar()
         .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("value:Q", title="% TPV"),
-            color=alt.Color("metric:N", title=None),
+            x=alt.X("step:N", title=None, sort=list(wf_df["step"])),
+            y=alt.Y("start:Q", axis=alt.Axis(title="%")),
+            y2="end:Q",
+            color=alt.Color("type:N", scale=color_scale, legend=None),
             tooltip=[
-                alt.Tooltip("date:T", title="Date"),
-                alt.Tooltip("name:N", title="Scenario"),
-                alt.Tooltip("metric:N", title="Metric"),
-                alt.Tooltip("value:Q", title="Value", format=".2f"),
+                alt.Tooltip("step:N", title="Step"),
+                alt.Tooltip("value:Q", title="Valeur", format=".2f"),
             ],
         )
-        .properties(height=280)
     )
-    st.altair_chart(line, use_container_width=True)
+    wf_labels = (
+        alt.Chart(wf_df)
+        .mark_text(dy=-6, color="#333", fontSize=11)
+        .encode(
+            x=alt.X("step:N", sort=list(wf_df["step"])),
+            y="end:Q",
+            text=alt.Text("value:Q", format=".2f"),
+        )
+    )
+    st.altair_chart((waterfall_chart + wf_labels).properties(height=260), use_container_width=True)
 
-    st.dataframe(hist_df, use_container_width=True)
+    # --------------------------------------------------
+    # WATERFALL 2 : version enrichie demandée au board
+    # --------------------------------------------------
+    st.markdown("### Décomposition complète (CM1, CM2, Break-even)")
+    wf_full_df = make_waterfall_df_full(
+        revenu_pct,
+        cout_paiement_pct,
+        cout_liquidite_10j_pct,
+        defaut_30j_pct,
+        cm1_pct,
+        fixed_opex_pct_of_tpv,
+        break_even_pct,
+    )
 
-# ----------------------------------------------------------
-# MANAGEMENT COMMENT
-# ----------------------------------------------------------
-st.markdown("## Ce que ce dashboard doit te faire voir")
-comment_df = pd.DataFrame(
-    [
-        {
-            "Question": "Le moteur transactionnel est-il bon ?",
-            "Metric": "CM1",
-            "Lecture": "Si CM1 monte, ton pricing / paiement / liquidité s’améliorent."
-        },
-        {
-            "Question": "La croissance marginale crée-t-elle de la valeur ?",
-            "Metric": "CM2",
-            "Lecture": "Si CM2 reste faible malgré CM1 fort, tu as un problème de coût de service, risque ou machine humaine."
-        },
-        {
-            "Question": "La structure actuelle est-elle absorbable ?",
-            "Metric": "Break-even contribution",
-            "Lecture": "Si la courbe passe au-dessus de zéro, ton modèle couvre enfin sa structure fixe."
-        },
-    ]
-)
-st.dataframe(comment_df, use_container_width=True)
+    waterfall_full_chart = (
+        alt.Chart(wf_full_df)
+        .mark_bar()
+        .encode(
+            x=alt.X("step:N", title=None, sort=list(wf_full_df["step"])),
+            y=alt.Y("start:Q", axis=alt.Axis(title="% du TPV")),
+            y2="end:Q",
+            color=alt.Color("type:N", scale=color_scale, legend=None),
+            tooltip=[
+                alt.Tooltip("step:N", title="Step"),
+                alt.Tooltip("value:Q", title="Valeur", format=".2f"),
+            ],
+        )
+    )
+    waterfall_full_labels = (
+        alt.Chart(wf_full_df)
+        .mark_text(dy=-6, color="#333", fontSize=11)
+        .encode(
+            x=alt.X("step:N", sort=list(wf_full_df["step"])),
+            y="end:Q",
+            text=alt.Text("value:Q", format=".2f"),
+        )
+    )
+    st.altair_chart((waterfall_full_chart + waterfall_full_labels).properties(height=300), use_container_width=True)
+
+    # --------------------------------------------------
+    # TIME SERIES
+    # --------------------------------------------------
+    st.markdown("### Évolution dans le temps")
+    df_hist = pd.DataFrame(st.session_state.scenarios)
+    df_hist = df_hist[df_hist["date"].isin(HISTORY_DATES)].sort_values("date")
+    df_hist = df_hist.drop_duplicates(subset=["date"], keep="last")
+
+    if not df_hist.empty:
+        df_long = df_hist.melt(
+            id_vars=["date", "name"],
+            value_vars=["cm1_pct", "cm2_pct"],
+            var_name="metric",
+            value_name="value",
+        )
+
+        line_chart = (
+            alt.Chart(df_long)
+            .mark_line(point=True)
+            .encode(
+                x=alt.X("date:T", title="Date"),
+                y=alt.Y("value:Q", title="%"),
+                color=alt.Color("metric:N", title=None),
+                tooltip=[
+                    alt.Tooltip("date:T", title="Date"),
+                    alt.Tooltip("name:N", title="Scénario"),
+                    alt.Tooltip("metric:N", title="Metric"),
+                    alt.Tooltip("value:Q", title="Valeur", format=".2f"),
+                ],
+            )
+            .properties(height=260)
+        )
+        st.altair_chart(line_chart, use_container_width=True)
+
+    st.dataframe(df_hist, use_container_width=True)

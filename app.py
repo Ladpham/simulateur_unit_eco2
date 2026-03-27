@@ -126,9 +126,10 @@ for k, default_val in [
     ("loan_book_k", 300.0),
     ("avg_loan_value_eur", 300.0),
     ("tx_per_client_per_month", 2.9),
-    # P&L extra inputs (monthly €)
-    ("cogs_k", 20.0),
-    ("cac_k", 15.0),
+    # P&L extra inputs
+    ("cogs_per_client_eur", 5.0),
+    ("cac_per_new_client_eur", 30.0),
+    ("growth_months", 12),
     ("opex_current_k", 80.0),
     ("opex_improved_k", 60.0),
 ]:
@@ -230,20 +231,20 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .pnl-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 14px;
+  font-size: 12px;
   margin-bottom: 8px;
 }
 .pnl-table td {
-  padding: 7px 12px;
+  padding: 4px 10px;
   border-bottom: 1px solid rgba(0,0,0,0.07);
 }
 .pnl-table td:last-child { text-align: right; font-weight: 600; }
 .pnl-table td:first-child { color: #333; }
-.pnl-row-sub td { opacity: 0.72; font-size: 13px; }
-.pnl-row-sub td:first-child { padding-left: 28px; }
+.pnl-row-sub td { opacity: 0.72; font-size: 11px; }
+.pnl-row-sub td:first-child { padding-left: 22px; }
 .pnl-row-margin td {
   font-weight: 800;
-  font-size: 15px;
+  font-size: 12px;
   background: rgba(6,76,114,0.07);
   border-top: 2px solid rgba(6,76,114,0.25) !important;
   border-bottom: 2px solid rgba(6,76,114,0.25) !important;
@@ -251,7 +252,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 }
 .pnl-row-ebitda td {
   font-weight: 900;
-  font-size: 16px;
+  font-size: 13px;
   background: rgba(27,90,67,0.10);
   border-top: 2px solid #1B5A43 !important;
   color: #1B5A43;
@@ -561,69 +562,92 @@ else:
     st.markdown("---")
 
     # ==================================================
-    # P&L TABLE — above waterfall
+    # P&L SECTION
     # ==================================================
-    st.markdown("### P&L — Cascade par transaction → résultat mensuel")
+    st.markdown("#### P&L — Cascade mensuelle")
 
-    # ---- Extra cost inputs
+    # --------------------------------------------------
+    # ⚙️ Cost inputs FIRST (above table)
+    # --------------------------------------------------
     with st.expander("⚙️  Paramétrer les coûts variables & fixes", expanded=True):
-        pnl_col1, pnl_col2, pnl_col3 = st.columns(3, gap="large")
+        pnl_col1, pnl_col2, pnl_col3, pnl_col4 = st.columns(4, gap="large")
 
+        # --- COGS: per client served (active borrowers this month)
         with pnl_col1:
-            st.markdown("**COGS (k€ / mois)**")
-            cogs_k_input = st.number_input("COGS value", min_value=0.0, max_value=500.0,
-                                           value=float(st.session_state["cogs_k"]),
-                                           step=1.0, label_visibility="collapsed", key="_cogs_input")
-            st.slider("COGS slider", min_value=0.0, max_value=500.0,
-                      value=float(st.session_state["cogs_k"]),
-                      step=1.0, key="cogs_k", label_visibility="collapsed")
-            st.caption("Coûts directs opérationnels (infrastructure, data…)")
+            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">COGS / client servi (€)</p>', unsafe_allow_html=True)
+            st.number_input("cogs_per_client_eur_input", min_value=0.0, max_value=500.0,
+                            value=float(st.session_state.get("cogs_per_client_eur", 5.0)),
+                            step=0.5, label_visibility="collapsed", key="cogs_per_client_eur")
+            st.slider("cogs_per_client_slider", min_value=0.0, max_value=100.0,
+                      value=float(st.session_state.get("cogs_per_client_eur", 5.0)),
+                      step=0.5, key="_cogs_per_client_slider", label_visibility="collapsed",
+                      on_change=lambda: st.session_state.update({"cogs_per_client_eur": st.session_state["_cogs_per_client_slider"]}))
+            st.markdown('<p style="font-size:11px; opacity:0.6; margin-top:2px;">Infra, data, support par client actif</p>', unsafe_allow_html=True)
 
+        # --- CAC: per new client acquired — derived from growth slider
         with pnl_col2:
-            st.markdown("**CAC (k€ / mois)**")
-            cac_k_input = st.number_input("CAC value", min_value=0.0, max_value=500.0,
-                                          value=float(st.session_state["cac_k"]),
-                                          step=1.0, label_visibility="collapsed", key="_cac_input")
-            st.slider("CAC slider", min_value=0.0, max_value=500.0,
-                      value=float(st.session_state["cac_k"]),
-                      step=1.0, key="cac_k", label_visibility="collapsed")
-            st.caption("Coût d'acquisition client (marketing, sales…)")
+            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">CAC / nouveau client (€)</p>', unsafe_allow_html=True)
+            st.number_input("cac_per_new_client_eur_input", min_value=0.0, max_value=5000.0,
+                            value=float(st.session_state.get("cac_per_new_client_eur", 30.0)),
+                            step=1.0, label_visibility="collapsed", key="cac_per_new_client_eur")
+            st.slider("cac_per_new_client_slider", min_value=0.0, max_value=500.0,
+                      value=float(st.session_state.get("cac_per_new_client_eur", 30.0)),
+                      step=1.0, key="_cac_per_new_client_slider", label_visibility="collapsed",
+                      on_change=lambda: st.session_state.update({"cac_per_new_client_eur": st.session_state["_cac_per_new_client_slider"]}))
+            st.markdown('<p style="font-size:11px; opacity:0.6; margin-top:2px;">Marketing, sales, onboarding</p>', unsafe_allow_html=True)
 
+        # --- Growth period → derive new clients/month
         with pnl_col3:
-            st.markdown("**Opex (k€ / mois)**")
-            st.markdown("*Current team*")
-            opex_cur_input = st.number_input("Opex current value", min_value=0.0, max_value=1000.0,
-                                             value=float(st.session_state["opex_current_k"]),
-                                             step=1.0, label_visibility="collapsed", key="_opex_cur_input")
-            st.slider("Opex current slider", min_value=0.0, max_value=1000.0,
-                      value=float(st.session_state["opex_current_k"]),
-                      step=1.0, key="opex_current_k", label_visibility="collapsed")
+            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">Horizon de croissance (mois)</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:11px; opacity:0.6; margin-bottom:4px;">Base : 500 clients aujourd\'hui</p>', unsafe_allow_html=True)
+            st.slider("growth_months_slider", min_value=1, max_value=36,
+                      value=int(st.session_state.get("growth_months", 12)),
+                      step=1, key="growth_months", label_visibility="collapsed")
+            target_clients = nb_clients_per_month  # target = clients needed/month at given volume
+            base_clients = 500.0
+            growth_months = int(st.session_state.get("growth_months", 12))
+            new_clients_per_month = max(0.0, (target_clients - base_clients) / growth_months)
+            st.markdown(
+                f'<p style="font-size:11px; margin-top:4px;">→ <b>{new_clients_per_month:,.0f} nouveaux clients/mois</b> pour atteindre {target_clients:,.0f} en {growth_months} mois</p>',
+                unsafe_allow_html=True,
+            )
 
-            st.markdown("*Improved team (EoY 2026)*")
-            opex_imp_input = st.number_input("Opex improved value", min_value=0.0, max_value=1000.0,
-                                             value=float(st.session_state["opex_improved_k"]),
-                                             step=1.0, label_visibility="collapsed", key="_opex_imp_input")
-            st.slider("Opex improved slider", min_value=0.0, max_value=1000.0,
-                      value=float(st.session_state["opex_improved_k"]),
-                      step=1.0, key="opex_improved_k", label_visibility="collapsed")
+        # --- Opex: current team only (improved slider removed)
+        with pnl_col4:
+            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">Opex — current team (k€/mois)</p>', unsafe_allow_html=True)
+            st.number_input("opex_current_input", min_value=0.0, max_value=1000.0,
+                            value=float(st.session_state.get("opex_current_k", 80.0)),
+                            step=1.0, label_visibility="collapsed", key="opex_current_k")
+            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px; margin-top:8px;">Opex — improved team (k€/mois)</p>', unsafe_allow_html=True)
+            st.number_input("opex_improved_input", min_value=0.0, max_value=1000.0,
+                            value=float(st.session_state.get("opex_improved_k", 60.0)),
+                            step=1.0, label_visibility="collapsed", key="opex_improved_k")
+            st.markdown('<p style="font-size:11px; opacity:0.6; margin-top:2px;">Salaires, bureaux, outils</p>', unsafe_allow_html=True)
 
-    # Sync number inputs → session state (number_input returns live value)
-    cogs_k = float(st.session_state["cogs_k"])
-    cac_k = float(st.session_state["cac_k"])
-    opex_current_k = float(st.session_state["opex_current_k"])
-    opex_improved_k = float(st.session_state["opex_improved_k"])
+    # --------------------------------------------------
+    # Compute derived P&L values
+    # --------------------------------------------------
+    cogs_per_client_eur = float(st.session_state.get("cogs_per_client_eur", 5.0))
+    cac_per_new_client_eur = float(st.session_state.get("cac_per_new_client_eur", 30.0))
+    opex_current_k = float(st.session_state.get("opex_current_k", 80.0))
+    opex_improved_k = float(st.session_state.get("opex_improved_k", 60.0))
+    growth_months = int(st.session_state.get("growth_months", 12))
 
-    # --- P&L cascade computations (monthly k€)
+    # nb_clients_per_month already computed above in RIGHT section
+    new_clients_per_month = max(0.0, (nb_clients_per_month - base_clients) / growth_months)
+    cogs_k = nb_clients_per_month * cogs_per_client_eur / 1000
+    cac_k = new_clients_per_month * cac_per_new_client_eur / 1000
+
     rev_k = monthly_revenue_eur / 1000
     tx_cost_k = monthly_volume_eur * (cout_paiement_pct / 100) / 1000
     liq_cost_k = monthly_volume_eur * (cout_liquidite_10j_pct / 100) / 1000
     risk_cost_k = monthly_volume_eur * (defaut_30j_pct / 100) / 1000
 
-    cm1_k = rev_k - tx_cost_k - liq_cost_k               # CM1 = Revenue - Tx - Liquidité
-    cm2_k = cm1_k - risk_cost_k - cogs_k                  # CM2 = CM1 - Risk - COGS
-    cm3_k = cm2_k - cac_k                                 # CM3 = CM2 - CAC
-    ebitda_current_k = cm3_k - opex_current_k             # EBITDA current team
-    ebitda_improved_k = cm3_k - opex_improved_k           # EBITDA improved team
+    cm1_k = rev_k - tx_cost_k - liq_cost_k
+    cm2_k = cm1_k - risk_cost_k - cogs_k
+    cm3_k = cm2_k - cac_k
+    ebitda_current_k = cm3_k - opex_current_k
+    ebitda_improved_k = cm3_k - opex_improved_k
 
     def color_val(v):
         c = "#1B5A43" if v >= 0 else "#C0392B"
@@ -632,8 +656,10 @@ else:
     def neutral_val(v):
         return f'<span style="font-weight:600;">{v:,.1f} k€</span>'
 
-    # ---- Render table + comparison cards side by side
-    tbl_col, card_col = st.columns([0.55, 0.45], gap="large")
+    # --------------------------------------------------
+    # P&L Table + EBITDA cards
+    # --------------------------------------------------
+    tbl_col, card_col = st.columns([0.52, 0.48], gap="large")
 
     with tbl_col:
         st.markdown(
@@ -644,9 +670,9 @@ else:
               <tr class="pnl-row-sub"><td>↳ Coût liquidité (10j)</td><td>{color_val(-liq_cost_k)}</td></tr>
               <tr class="pnl-row-margin"><td>CM 1</td><td>{color_val(cm1_k)}</td></tr>
               <tr class="pnl-row-sub"><td>↳ Risk / Défaut 30j</td><td>{color_val(-risk_cost_k)}</td></tr>
-              <tr class="pnl-row-sub"><td>↳ COGS</td><td>{color_val(-cogs_k)}</td></tr>
+              <tr class="pnl-row-sub"><td>↳ COGS <span style="opacity:0.55;">({nb_clients_per_month:,.0f} clients × {cogs_per_client_eur:.1f} €)</span></td><td>{color_val(-cogs_k)}</td></tr>
               <tr class="pnl-row-margin"><td>CM 2</td><td>{color_val(cm2_k)}</td></tr>
-              <tr class="pnl-row-sub"><td>↳ CAC</td><td>{color_val(-cac_k)}</td></tr>
+              <tr class="pnl-row-sub"><td>↳ CAC <span style="opacity:0.55;">({new_clients_per_month:,.0f} new × {cac_per_new_client_eur:.0f} €)</span></td><td>{color_val(-cac_k)}</td></tr>
               <tr class="pnl-row-margin"><td>CM 3</td><td>{color_val(cm3_k)}</td></tr>
               <tr class="pnl-row-sub"><td>↳ Opex — current team</td><td>{color_val(-opex_current_k)}</td></tr>
               <tr class="pnl-row-sub"><td>↳ Opex — improved team</td><td>{color_val(-opex_improved_k)}</td></tr>
@@ -656,8 +682,6 @@ else:
         )
 
     with card_col:
-        st.markdown("**EBITDA — comparaison équipes**")
-
         ebitda_cur_color = "#1B5A43" if ebitda_current_k >= 0 else "#C0392B"
         ebitda_imp_color = "#1B5A43" if ebitda_improved_k >= 0 else "#C0392B"
         delta_k = ebitda_improved_k - ebitda_current_k
@@ -665,31 +689,29 @@ else:
 
         st.markdown(
             f"""
-            <div style="display:flex; gap:14px; margin-top:8px;">
+            <p style="font-size:12px; font-weight:700; margin-bottom:6px;">EBITDA — comparaison équipes</p>
+            <div style="display:flex; gap:12px; margin-top:4px;">
               <div class="cost-card">
                 <div class="cc-title">Current team</div>
                 <div class="cc-value" style="color:{ebitda_cur_color};">{ebitda_current_k:+,.1f} k€</div>
                 <div class="cc-sub">Opex = {opex_current_k:,.0f} k€/mois</div>
               </div>
               <div class="cost-card improved">
-                <div class="cc-title">Improved team — EoY 2026</div>
+                <div class="cc-title">Improved — EoY 2026</div>
                 <div class="cc-value" style="color:{ebitda_imp_color};">{ebitda_improved_k:+,.1f} k€</div>
                 <div class="cc-sub">Opex = {opex_improved_k:,.0f} k€/mois</div>
               </div>
             </div>
-            <div style="margin-top:10px; padding:10px 14px; border-radius:10px;
-                        background:rgba(0,0,0,0.04); font-size:13px;">
-              Gain potentiel : <span style="font-weight:800; color:{delta_color};">{delta_k:+,.1f} k€ / mois</span>
+            <div style="margin-top:8px; padding:8px 12px; border-radius:8px;
+                        background:rgba(0,0,0,0.04); font-size:12px;">
+              Gain potentiel : <span style="font-weight:800; color:{delta_color};">{delta_k:+,.1f} k€/mois</span>
               via optimisation Opex ({opex_current_k - opex_improved_k:,.0f} k€ d'écart)
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        st.markdown("<br>", unsafe_allow_html=True)
-
-        # Mini breakdown bar chart (CM1 → CM2 → CM3 → EBITDA)
-        st.markdown("**Cascade CM → EBITDA (current)**")
+        # Cascade bar chart
         cascade_data = pd.DataFrame({
             "Étape": ["CM 1", "CM 2", "CM 3", "EBITDA\n(current)", "EBITDA\n(improved)"],
             "Valeur": [cm1_k, cm2_k, cm3_k, ebitda_current_k, ebitda_improved_k],
@@ -701,10 +723,7 @@ else:
                 "imp" if ebitda_improved_k >= 0 else "neg",
             ],
         })
-        color_scale_cascade = alt.Scale(
-            domain=["pos", "neg", "imp"],
-            range=["#064C72", "#F83131", "#1B5A43"]
-        )
+        color_scale_cascade = alt.Scale(domain=["pos", "neg", "imp"], range=["#064C72", "#F83131", "#1B5A43"])
         cascade_chart = (
             alt.Chart(cascade_data)
             .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4, cornerRadiusBottomLeft=4, cornerRadiusBottomRight=4)
@@ -714,7 +733,6 @@ else:
                 color=alt.Color("Couleur:N", scale=color_scale_cascade, legend=None),
                 tooltip=[alt.Tooltip("Étape:N"), alt.Tooltip("Valeur:Q", format=",.1f", title="k€")],
             )
-            .properties(height=180)
         )
         cascade_labels = (
             alt.Chart(cascade_data)
@@ -725,7 +743,7 @@ else:
                 text=alt.Text("Valeur:Q", format=".1f"),
             )
         )
-        st.altair_chart((cascade_chart + cascade_labels).properties(height=180), use_container_width=True)
+        st.altair_chart((cascade_chart + cascade_labels).properties(height=170), use_container_width=True)
 
     st.markdown("---")
 
@@ -776,666 +794,3 @@ else:
         )
     )
     st.altair_chart((waterfall_chart + wf_labels).properties(height=260), use_container_width=True)
-
-    # --------------------------------------------------
-    # TIME SERIES
-    # --------------------------------------------------
-    st.markdown("### Évolution dans le temps (Contribution margin uniquement)")
-    df_hist = pd.DataFrame(st.session_state.scenarios)
-    df_hist = df_hist[df_hist["date"].isin(HISTORY_DATES)].sort_values("date")
-    df_hist = df_hist.drop_duplicates(subset=["date"], keep="last")
-
-    line_chart = (
-        alt.Chart(df_hist).mark_line(point=True)
-        .encode(
-            x=alt.X("date:T", title="Date"),
-            y=alt.Y("contribution_margin_pct:Q", title="%"),
-            tooltip=[
-                alt.Tooltip("date:T", title="Date"),
-                alt.Tooltip("contribution_margin_pct:Q", title="Contribution (%)", format=".2f"),
-            ],
-        )
-        .properties(height=260)
-    )
-    st.altair_chart(line_chart, use_container_width=True)
-    st.dataframe(df_hist, use_container_width=True)
-
-# import streamlit as st
-# import pandas as pd
-# import altair as alt
-# from datetime import date
-
-# # --------------------------------------------------
-# # CONFIG
-# # --------------------------------------------------
-# st.set_page_config(page_title="Waribei – Unit Economics", layout="wide")
-# DUREE_PERIODE_LIQUIDITE_JOURS = 10
-
-# # --------------------------------------------------
-# # PRESETS (historique + défaut)
-# # --------------------------------------------------
-# PRESETS_BY_DATE = {
-#     date(2025, 6, 1): {
-#         "name": "Historique – Jun 2025",
-#         "revenu_pct": 3.73,
-#         "cout_paiement_pct": 1.75,
-#         "cout_liquidite_10j_pct": 0.21,
-#         "defaut_30j_pct": 1.43,
-#         "loan_book_k": 140.0,
-#         "cycles_per_month": 2.9,
-#         "fixed_opex_monthly": 14000.0,
-#     },
-#     date(2025, 12, 1): {
-#         "name": "Historique – Dec 2025",
-#         "revenu_pct": 3.76,
-#         "cout_paiement_pct": 1.80,
-#         "cout_liquidite_10j_pct": 0.36,
-#         "defaut_30j_pct": 1.00,
-#         "loan_book_k": 155.0,
-#         "cycles_per_month": 2.9,
-#         "fixed_opex_monthly": 14000.0,
-#     },
-#     date(2026, 6, 1): {
-#         "name": "Default – Jun 2026",
-#         "revenu_pct": 3.80,
-#         "cout_paiement_pct": 1.20,
-#         "cout_liquidite_10j_pct": 0.40,
-#         "defaut_30j_pct": 1.00,
-#         "loan_book_k": 320.0,
-#         "cycles_per_month": 2.9,
-#         "fixed_opex_monthly": 14000.0,
-#     },
-# }
-# DEFAULT_DATE = date(2026, 6, 1)
-# HISTORY_DATES = [date(2025, 6, 1), date(2025, 12, 1), date(2026, 6, 1)]
-
-# # --------------------------------------------------
-# # SCÉNARIOS RAPIDES
-# # --------------------------------------------------
-# SCENARIOS_PRESETS = {
-#     "Custom": None,
-#     "Base scénario — Aujourd’hui": {
-#         "revenu_pct": 3.80,
-#         "cout_paiement_pct": 1.60,
-#         "cout_liquidite_10j_pct": 0.40,
-#         "defaut_30j_pct": 1.00,
-#         "loan_book_k": 225.0,
-#         "cycles_per_month": 2.9,
-#         "fixed_opex_monthly": 14000.0,
-#         "scenario_name_autofill": "Base scénario — Aujourd’hui",
-#     },
-#     "Scénario 1 — Optimisation légère": {
-#         "revenu_pct": 3.80,
-#         "cout_paiement_pct": 1.20,
-#         "cout_liquidite_10j_pct": 0.40,
-#         "defaut_30j_pct": 1.00,
-#         "loan_book_k": 320.0,
-#         "cycles_per_month": 2.9,
-#         "fixed_opex_monthly": 14000.0,
-#         "scenario_name_autofill": "Scénario 1 — Optimisation légère",
-#     },
-#     "Scénario 2 — Open Banking": {
-#         "revenu_pct": 3.80,
-#         "cout_paiement_pct": 0.50,
-#         "cout_liquidite_10j_pct": 0.40,
-#         "defaut_30j_pct": 0.62,
-#         "loan_book_k": 280.0,
-#         "cycles_per_month": 3.0,
-#         "fixed_opex_monthly": 14000.0,
-#         "scenario_name_autofill": "Scénario 2 — Open Banking",
-#     },
-#     "Scénario 3 — Scale disciplinée": {
-#         "revenu_pct": 3.80,
-#         "cout_paiement_pct": 1.00,
-#         "cout_liquidite_10j_pct": 0.40,
-#         "defaut_30j_pct": 0.80,
-#         "loan_book_k": 500.0,
-#         "cycles_per_month": 3.0,
-#         "fixed_opex_monthly": 14000.0,
-#         "scenario_name_autofill": "Scénario 3 — Scale disciplinée",
-#     },
-# }
-
-# # --------------------------------------------------
-# # SESSION STATE INIT
-# # --------------------------------------------------
-# def init_state():
-#     if "scenario_date" not in st.session_state:
-#         st.session_state["scenario_date"] = DEFAULT_DATE
-
-#     if "scenarios" not in st.session_state:
-#         st.session_state["scenarios"] = [
-#             {
-#                 "date": date(2025, 6, 1),
-#                 "name": "Historique – Jun 2025",
-#                 "cm1_pct": 3.73 - 1.75 - 0.21,
-#                 "cm2_pct": 3.73 - 1.75 - 0.21 - 1.43,
-#                 "contribution_margin_pct": 3.73 - 1.75 - 0.21 - 1.43,
-#                 "break_even_gap_eur": None,
-#             },
-#             {
-#                 "date": date(2025, 12, 1),
-#                 "name": "Historique – Dec 2025",
-#                 "cm1_pct": 3.76 - 1.80 - 0.36,
-#                 "cm2_pct": 3.76 - 1.80 - 0.36 - 1.00,
-#                 "contribution_margin_pct": 3.76 - 1.80 - 0.36 - 1.00,
-#                 "break_even_gap_eur": None,
-#             },
-#             {
-#                 "date": date(2026, 6, 1),
-#                 "name": "Default – Jun 2026",
-#                 "cm1_pct": 3.80 - 1.20 - 0.40,
-#                 "cm2_pct": 3.80 - 1.20 - 0.40 - 1.00,
-#                 "contribution_margin_pct": 3.80 - 1.20 - 0.40 - 1.00,
-#                 "break_even_gap_eur": None,
-#             },
-#         ]
-
-#     if "pending_scenario" not in st.session_state:
-#         st.session_state["pending_scenario"] = None
-
-# init_state()
-
-# # --------------------------------------------------
-# # HELPERS
-# # --------------------------------------------------
-# def euro(x):
-#     return f"{x:,.0f} €".replace(",", " ")
-
-# def pct(x):
-#     return f"{x:.2f}%"
-
-# def safe_div(a, b):
-#     return a / b if b not in [0, None] else 0.0
-
-# def apply_preset_for_date(d, force=True):
-#     preset = PRESETS_BY_DATE.get(d)
-#     if not preset:
-#         return
-
-#     for key, val in preset.items():
-#         state_key = key
-#         if force or state_key not in st.session_state:
-#             st.session_state[state_key] = val
-
-# def apply_scenario_preset(name):
-#     preset = SCENARIOS_PRESETS.get(name)
-#     if not preset:
-#         return
-#     for key, val in preset.items():
-#         st.session_state[key] = val
-
-# def vbar_widget(label, key, min_value, max_value, step, help_text="", kind="neutral"):
-#     value = float(st.session_state.get(key, min_value))
-#     st.metric(label, pct(value))
-#     st.slider(
-#         label="",
-#         min_value=float(min_value),
-#         max_value=float(max_value),
-#         value=float(value),
-#         step=float(step),
-#         key=key,
-#         help=help_text,
-#     )
-
-# def knob_simple_visual(label, value, min_value, max_value):
-#     st.markdown(f"**{label}**")
-#     st.metric("", f"{value:.1f}")
-
-# def make_waterfall_df_cm2(revenue, pay_cost, liq_cost, default_cost, margin):
-#     steps = ["Revenu", "Coût paiement", "Coût liquidité (10j)", "Défaut 30j", "CM2"]
-#     values = [revenue, -pay_cost, -liq_cost, -default_cost, margin]
-
-#     start, end = [], []
-#     running = 0.0
-#     for v in values[:-1]:
-#         start.append(running)
-#         running += v
-#         end.append(running)
-
-#     start.append(0.0)
-#     end.append(margin)
-
-#     types = []
-#     for i, v in enumerate(values):
-#         if i == len(values) - 1:
-#             types.append("total")
-#         elif v >= 0:
-#             types.append("positive")
-#         else:
-#             types.append("negative")
-
-#     return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
-
-# def make_waterfall_df_full(revenue, pay_cost, liq_cost, default_cost, cm1, fixed_opex_pct, break_even_pct):
-#     steps = [
-#         "Revenu",
-#         "Coût paiement",
-#         "Coût liquidité (10j)",
-#         "CM1",
-#         "Défaut 30j",
-#         "CM2",
-#         "OPEX fixes",
-#         "Break-even",
-#     ]
-#     values = [
-#         revenue,
-#         -pay_cost,
-#         -liq_cost,
-#         cm1,
-#         -default_cost,
-#         cm1 - default_cost,
-#         -fixed_opex_pct,
-#         break_even_pct,
-#     ]
-
-#     start, end = [], []
-#     running = 0.0
-#     total_steps = {"CM1", "CM2", "Break-even"}
-
-#     for step, val in zip(steps, values):
-#         if step in total_steps:
-#             start.append(0.0)
-#             end.append(val)
-#         else:
-#             start.append(running)
-#             running += val
-#             end.append(running)
-
-#     types = []
-#     for step, val in zip(steps, values):
-#         if step in total_steps:
-#             types.append("total")
-#         elif val >= 0:
-#             types.append("positive")
-#         else:
-#             types.append("negative")
-
-#     return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
-
-# # --------------------------------------------------
-# # STYLES
-# # --------------------------------------------------
-# st.markdown(
-#     """
-#     <style>
-#     .wb-card {
-#         border: 1px solid rgba(0,0,0,0.08);
-#         border-radius: 18px;
-#         padding: 18px 18px 10px 18px;
-#         background: white;
-#         box-shadow: 0 2px 10px rgba(0,0,0,0.03);
-#     }
-#     </style>
-#     """,
-#     unsafe_allow_html=True,
-# )
-
-# # --------------------------------------------------
-# # NAVIGATION
-# # --------------------------------------------------
-# page = st.sidebar.radio("Navigation", ["Simulateur", "Comment je modélise une courbe ?"])
-
-# # ==================================================
-# # PAGE 2
-# # ==================================================
-# if page == "Comment je modélise une courbe ?":
-#     st.title("Comment fonctionne le simulateur Waribei ?")
-#     st.markdown(
-#         """
-# - Historique : **Jun 2025**, **Dec 2025**, **Jun 2026**
-# - **CM1** = revenu - coût paiement - coût liquidité
-# - **CM2** = CM1 - défaut 30j
-# - **Break-even** = contribution mensuelle - OPEX fixes
-# - Courbe historique : **CM1** et **CM2**
-# """
-#     )
-
-# # ==================================================
-# # PAGE 1
-# # ==================================================
-# else:
-#     top = st.columns([0.7, 0.3])
-#     with top[0]:
-#         st.title("Unit Economics – Waribei")
-#     with top[1]:
-#         try:
-#             st.image("logo_waribei_icon@2x.png", width=100)
-#         except Exception:
-#             st.write("Logo Waribei")
-
-#     st.markdown("---")
-
-#     # --------------------------------------------------
-#     # APPLY PENDING SCENARIO
-#     # --------------------------------------------------
-#     if "pending_scenario" in st.session_state and st.session_state.pending_scenario:
-#         apply_scenario_preset(st.session_state.pending_scenario)
-#         st.session_state.pending_scenario = None
-
-#     # --------------------------------------------------
-#     # SIDEBAR CONTROLS
-#     # --------------------------------------------------
-#     with st.sidebar:
-#         st.markdown("### Presets rapides")
-#         selected_preset = st.selectbox("Scénario rapide", list(SCENARIOS_PRESETS.keys()))
-#         if selected_preset != "Custom":
-#             if st.button("Appliquer le preset"):
-#                 apply_scenario_preset(selected_preset)
-
-#         st.markdown("---")
-#         dcols = st.columns([0.72, 0.28])
-#         with dcols[1]:
-#             if st.button("Today"):
-#                 st.session_state["scenario_date"] = DEFAULT_DATE
-#                 apply_preset_for_date(DEFAULT_DATE, force=True)
-#         with dcols[0]:
-#             picked = st.date_input("Date", value=st.session_state.get("scenario_date", DEFAULT_DATE))
-#             st.session_state["scenario_date"] = picked
-#         apply_preset_for_date(st.session_state["scenario_date"], force=False)
-
-#         default_label = st.session_state.get("scenario_name_autofill", "Scenario")
-#         scenario_name = st.text_input("Label du scénario", value=default_label)
-
-#     # --------------------------------------------------
-#     # MAIN LAYOUT
-#     # --------------------------------------------------
-#     main_left, main_right = st.columns([0.68, 0.32], gap="large")
-
-#     # =========================
-#     # LEFT
-#     # =========================
-#     with main_left:
-#         # ---- Hypothèses par transaction
-#         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
-#         st.subheader("Hypothèses par transaction")
-
-#         c1, c2, c3, c4 = st.columns(4, gap="large")
-#         with c1:
-#             vbar_widget("Revenus / trx", "revenu_pct", 1.0, 5.0, 0.01, "Take-rate / commission moyenne.")
-#         with c2:
-#             vbar_widget("Coût paiement / trx", "cout_paiement_pct", 0.0, 2.5, 0.01, "Coût des rails de paiement.")
-#         with c3:
-#             vbar_widget("Coût liquidité (10j)", "cout_liquidite_10j_pct", 0.0, 1.5, 0.01, "Coût de financement sur 10 jours.")
-#         with c4:
-#             vbar_widget("Défaut 30j / trx", "defaut_30j_pct", 0.0, 5.0, 0.01, "Perte attendue nette à 30 jours.")
-
-#         st.markdown("</div>", unsafe_allow_html=True)
-#         st.markdown("")
-
-#         # ---- Variables de volume
-#         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
-#         st.subheader("Variables de volume")
-
-#         vcol1, vcol2 = st.columns([0.5, 0.5], gap="large")
-#         with vcol1:
-#             knob_simple_visual("Loan book moyen (k€)", float(st.session_state.get("loan_book_k", 320.0)), 50.0, 1000.0)
-#             st.slider(
-#                 label="",
-#                 min_value=50.0,
-#                 max_value=1000.0,
-#                 value=float(st.session_state.get("loan_book_k", 320.0)),
-#                 step=5.0,
-#                 key="loan_book_k",
-#             )
-
-#         with vcol2:
-#             knob_simple_visual("Cycles / mois", float(st.session_state.get("cycles_per_month", 2.9)), 1.0, 5.0)
-#             st.slider(
-#                 label="",
-#                 min_value=1.0,
-#                 max_value=5.0,
-#                 value=float(st.session_state.get("cycles_per_month", 2.9)),
-#                 step=0.1,
-#                 key="cycles_per_month",
-#             )
-
-#         st.markdown("</div>", unsafe_allow_html=True)
-#         st.markdown("")
-
-#         # ---- OPEX fixe
-#         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
-#         st.subheader("Structure fixe")
-
-#         op1, op2 = st.columns([0.45, 0.55], gap="large")
-#         with op1:
-#             st.metric("OPEX fixes mensuels", euro(float(st.session_state.get("fixed_opex_monthly", 14000.0))))
-#         with op2:
-#             st.slider(
-#                 "OPEX fixes mensuels (€)",
-#                 min_value=0.0,
-#                 max_value=40000.0,
-#                 value=float(st.session_state.get("fixed_opex_monthly", 14000.0)),
-#                 step=500.0,
-#                 key="fixed_opex_monthly",
-#                 help="Coûts fixes à couvrir pour atteindre le break-even.",
-#             )
-
-#         st.markdown("</div>", unsafe_allow_html=True)
-
-#     # =========================
-#     # RIGHT
-#     # =========================
-#     with main_right:
-#         revenu_pct = float(st.session_state["revenu_pct"])
-#         cout_paiement_pct = float(st.session_state["cout_paiement_pct"])
-#         cout_liquidite_10j_pct = float(st.session_state["cout_liquidite_10j_pct"])
-#         defaut_30j_pct = float(st.session_state["defaut_30j_pct"])
-#         loan_book_k = float(st.session_state["loan_book_k"])
-#         cycles_per_month = float(st.session_state["cycles_per_month"])
-#         fixed_opex_monthly = float(st.session_state["fixed_opex_monthly"])
-
-#         # Core calculations
-#         cm1_pct = revenu_pct - cout_paiement_pct - cout_liquidite_10j_pct
-#         cm2_pct = cm1_pct - defaut_30j_pct
-#         contribution_margin_pct = cm2_pct
-
-#         loan_book_eur = loan_book_k * 1000
-#         monthly_tpv_eur = loan_book_eur * cycles_per_month
-#         monthly_revenue_eur = monthly_tpv_eur * revenu_pct / 100
-#         monthly_cm1_eur = monthly_tpv_eur * cm1_pct / 100
-#         monthly_contribution_margin_eur = monthly_tpv_eur * contribution_margin_pct / 100
-#         break_even_gap_eur = monthly_contribution_margin_eur - fixed_opex_monthly
-#         fixed_opex_pct_of_tpv = safe_div(fixed_opex_monthly, monthly_tpv_eur) * 100
-#         break_even_pct = contribution_margin_pct - fixed_opex_pct_of_tpv
-
-#         # Revenue needed for break-even
-#         cm2_rate = contribution_margin_pct / 100
-#         mrr_needed_for_break_even = safe_div(fixed_opex_monthly, cm2_rate) if cm2_rate > 0 else None
-#         tpv_needed_for_break_even = mrr_needed_for_break_even / (revenu_pct / 100) if revenu_pct > 0 and mrr_needed_for_break_even is not None else None
-
-#         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
-#         st.subheader("Lecture business")
-
-#         st.metric("CM1 (%)", pct(cm1_pct), help="Revenu - coût paiement - coût liquidité")
-#         st.metric("CM2 (%)", pct(cm2_pct), help="CM1 - défaut 30j")
-#         st.metric("Contribution mensuelle", euro(monthly_contribution_margin_eur))
-#         st.metric("Break-even gap", euro(break_even_gap_eur))
-
-#         if mrr_needed_for_break_even is not None:
-#             st.metric("MRR requis pour break-even", euro(mrr_needed_for_break_even))
-#         else:
-#             st.metric("MRR requis pour break-even", "N/A")
-
-#         if tpv_needed_for_break_even is not None:
-#             st.metric("TPV requis pour break-even", euro(tpv_needed_for_break_even))
-#         else:
-#             st.metric("TPV requis pour break-even", "N/A")
-
-#         st.markdown("</div>", unsafe_allow_html=True)
-
-#         st.markdown("")
-
-#         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
-#         st.subheader("Tableau synthétique")
-
-#         summary_df = pd.DataFrame(
-#             {
-#                 "Métrique": [
-#                     "Revenue %",
-#                     "Coût paiement %",
-#                     "Coût liquidité %",
-#                     "Défaut 30j %",
-#                     "CM1 %",
-#                     "CM2 %",
-#                     "Loan book (€)",
-#                     "TPV mensuel (€)",
-#                     "Contribution mensuelle (€)",
-#                     "OPEX fixes mensuels (€)",
-#                     "Break-even gap (€)",
-#                 ],
-#                 "Valeur": [
-#                     pct(revenu_pct),
-#                     pct(cout_paiement_pct),
-#                     pct(cout_liquidite_10j_pct),
-#                     pct(defaut_30j_pct),
-#                     pct(cm1_pct),
-#                     pct(cm2_pct),
-#                     euro(loan_book_eur),
-#                     euro(monthly_tpv_eur),
-#                     euro(monthly_contribution_margin_eur),
-#                     euro(fixed_opex_monthly),
-#                     euro(break_even_gap_eur),
-#                 ],
-#             }
-#         )
-#         st.dataframe(summary_df, use_container_width=True, hide_index=True)
-
-#         if st.button("SAVE"):
-#             d = st.session_state["scenario_date"]
-#             record = {
-#                 "date": d,
-#                 "name": scenario_name,
-#                 "cm1_pct": cm1_pct,
-#                 "cm2_pct": cm2_pct,
-#                 "contribution_margin_pct": contribution_margin_pct,
-#                 "break_even_gap_eur": break_even_gap_eur,
-#             }
-
-#             replaced = False
-#             for i, s in enumerate(st.session_state.scenarios):
-#                 if s.get("date") == d:
-#                     st.session_state.scenarios[i] = record
-#                     replaced = True
-#                     break
-#             if not replaced:
-#                 st.session_state.scenarios.append(record)
-
-#             st.success(f"Scénario '{scenario_name}' sauvegardé ({d}).")
-
-#         st.markdown("</div>", unsafe_allow_html=True)
-
-#     st.markdown("---")
-
-#     # --------------------------------------------------
-#     # WATERFALL 1 : proche du dashboard existant
-#     # --------------------------------------------------
-#     st.markdown("### Décomposition par transaction (waterfall CM2)")
-#     wf_df = make_waterfall_df_cm2(
-#         revenu_pct,
-#         cout_paiement_pct,
-#         cout_liquidite_10j_pct,
-#         defaut_30j_pct,
-#         contribution_margin_pct,
-#     )
-
-#     color_scale = alt.Scale(domain=["positive", "negative", "total"], range=["#1B5A43", "#F83131", "#064C72"])
-#     waterfall_chart = (
-#         alt.Chart(wf_df)
-#         .mark_bar()
-#         .encode(
-#             x=alt.X("step:N", title=None, sort=list(wf_df["step"])),
-#             y=alt.Y("start:Q", axis=alt.Axis(title="%")),
-#             y2="end:Q",
-#             color=alt.Color("type:N", scale=color_scale, legend=None),
-#             tooltip=[
-#                 alt.Tooltip("step:N", title="Step"),
-#                 alt.Tooltip("value:Q", title="Valeur", format=".2f"),
-#             ],
-#         )
-#     )
-#     wf_labels = (
-#         alt.Chart(wf_df)
-#         .mark_text(dy=-6, color="#333", fontSize=11)
-#         .encode(
-#             x=alt.X("step:N", sort=list(wf_df["step"])),
-#             y="end:Q",
-#             text=alt.Text("value:Q", format=".2f"),
-#         )
-#     )
-#     st.altair_chart((waterfall_chart + wf_labels).properties(height=260), use_container_width=True)
-
-#     # --------------------------------------------------
-#     # WATERFALL 2 : version enrichie demandée au board
-#     # --------------------------------------------------
-#     st.markdown("### Décomposition complète (CM1, CM2, Break-even)")
-#     wf_full_df = make_waterfall_df_full(
-#         revenu_pct,
-#         cout_paiement_pct,
-#         cout_liquidite_10j_pct,
-#         defaut_30j_pct,
-#         cm1_pct,
-#         fixed_opex_pct_of_tpv,
-#         break_even_pct,
-#     )
-
-#     waterfall_full_chart = (
-#         alt.Chart(wf_full_df)
-#         .mark_bar()
-#         .encode(
-#             x=alt.X("step:N", title=None, sort=list(wf_full_df["step"])),
-#             y=alt.Y("start:Q", axis=alt.Axis(title="% du TPV")),
-#             y2="end:Q",
-#             color=alt.Color("type:N", scale=color_scale, legend=None),
-#             tooltip=[
-#                 alt.Tooltip("step:N", title="Step"),
-#                 alt.Tooltip("value:Q", title="Valeur", format=".2f"),
-#             ],
-#         )
-#     )
-#     waterfall_full_labels = (
-#         alt.Chart(wf_full_df)
-#         .mark_text(dy=-6, color="#333", fontSize=11)
-#         .encode(
-#             x=alt.X("step:N", sort=list(wf_full_df["step"])),
-#             y="end:Q",
-#             text=alt.Text("value:Q", format=".2f"),
-#         )
-#     )
-#     st.altair_chart((waterfall_full_chart + waterfall_full_labels).properties(height=300), use_container_width=True)
-
-#     # --------------------------------------------------
-#     # TIME SERIES
-#     # --------------------------------------------------
-#     st.markdown("### Évolution dans le temps")
-#     df_hist = pd.DataFrame(st.session_state.scenarios)
-#     df_hist = df_hist[df_hist["date"].isin(HISTORY_DATES)].sort_values("date")
-#     df_hist = df_hist.drop_duplicates(subset=["date"], keep="last")
-
-#     if not df_hist.empty:
-#         df_long = df_hist.melt(
-#             id_vars=["date", "name"],
-#             value_vars=["cm1_pct", "cm2_pct"],
-#             var_name="metric",
-#             value_name="value",
-#         )
-
-#         line_chart = (
-#             alt.Chart(df_long)
-#             .mark_line(point=True)
-#             .encode(
-#                 x=alt.X("date:T", title="Date"),
-#                 y=alt.Y("value:Q", title="%"),
-#                 color=alt.Color("metric:N", title=None),
-#                 tooltip=[
-#                     alt.Tooltip("date:T", title="Date"),
-#                     alt.Tooltip("name:N", title="Scénario"),
-#                     alt.Tooltip("metric:N", title="Metric"),
-#                     alt.Tooltip("value:Q", title="Valeur", format=".2f"),
-#                 ],
-#             )
-#             .properties(height=260)
-#         )
-#         st.altair_chart(line_chart, use_container_width=True)
-
-#     st.dataframe(df_hist, use_container_width=True)

@@ -131,7 +131,6 @@ for k, default_val in [
     ("cac_per_new_client_eur", 30.0),
     ("growth_months", 12),
     ("opex_current_k", 80.0),
-    ("opex_improved_k", 60.0),
 ]:
     if k not in st.session_state:
         st.session_state[k] = default_val
@@ -169,8 +168,12 @@ apply_preset_for_date(st.session_state.scenario_date, force=False)
 st.markdown(
     """
 <style>
-div.block-container { padding-top: 1.2rem; }
-h1, h2, h3 { letter-spacing: -0.02em; }
+div.block-container { padding-top: 1.2rem; font-size: 12px; }
+h1 { font-size: 1.4rem !important; letter-spacing: -0.02em; }
+h2, h3 { font-size: 1.0rem !important; letter-spacing: -0.02em; }
+p, li, .stMarkdown p { font-size: 12px !important; }
+.stMetric label { font-size: 11px !important; }
+.stMetric [data-testid="stMetricValue"] { font-size: 15px !important; }
 
 .wb-card {
   border: 1px solid rgba(0,0,0,0.10);
@@ -437,6 +440,51 @@ else:
                       step=0.5, key="tx_per_client_per_month", label_visibility="collapsed")
         st.markdown("</div>", unsafe_allow_html=True)
 
+        # ---- ⚙️ Coûts variables & fixes (just below Hypothèses opérationnelles)
+        st.markdown("")
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("⚙️ Coûts variables & fixes")
+
+        cc1, cc2, cc3, cc4 = st.columns(4, gap="large")
+
+        with cc1:
+            st.markdown('<p style="font-size:11px; font-weight:700; margin-bottom:2px;">COGS / client servi (€)</p>', unsafe_allow_html=True)
+            st.number_input("cogs_per_client_eur_input", min_value=0.0, max_value=500.0,
+                            value=float(st.session_state.get("cogs_per_client_eur", 5.0)),
+                            step=0.5, label_visibility="collapsed", key="cogs_per_client_eur")
+            st.slider("cogs_per_client_slider", min_value=0.0, max_value=100.0,
+                      value=float(st.session_state.get("cogs_per_client_eur", 5.0)),
+                      step=0.5, key="_cogs_per_client_slider", label_visibility="collapsed",
+                      on_change=lambda: st.session_state.update({"cogs_per_client_eur": st.session_state["_cogs_per_client_slider"]}))
+            st.markdown('<p style="font-size:10px; opacity:0.6; margin-top:2px;">Infra, data, support / client actif</p>', unsafe_allow_html=True)
+
+        with cc2:
+            st.markdown('<p style="font-size:11px; font-weight:700; margin-bottom:2px;">CAC / nouveau client (€)</p>', unsafe_allow_html=True)
+            st.number_input("cac_per_new_client_eur_input", min_value=0.0, max_value=5000.0,
+                            value=float(st.session_state.get("cac_per_new_client_eur", 30.0)),
+                            step=1.0, label_visibility="collapsed", key="cac_per_new_client_eur")
+            st.slider("cac_per_new_client_slider", min_value=0.0, max_value=500.0,
+                      value=float(st.session_state.get("cac_per_new_client_eur", 30.0)),
+                      step=1.0, key="_cac_per_new_client_slider", label_visibility="collapsed",
+                      on_change=lambda: st.session_state.update({"cac_per_new_client_eur": st.session_state["_cac_per_new_client_slider"]}))
+            st.markdown('<p style="font-size:10px; opacity:0.6; margin-top:2px;">Marketing, sales, onboarding</p>', unsafe_allow_html=True)
+
+        with cc3:
+            st.markdown('<p style="font-size:11px; font-weight:700; margin-bottom:2px;">Horizon de croissance (mois)</p>', unsafe_allow_html=True)
+            st.markdown('<p style="font-size:10px; opacity:0.6; margin-bottom:2px;">Base : 500 clients aujourd\'hui</p>', unsafe_allow_html=True)
+            st.slider("growth_months_slider", min_value=1, max_value=36,
+                      value=int(st.session_state.get("growth_months", 12)),
+                      step=1, key="growth_months", label_visibility="collapsed")
+
+        with cc4:
+            st.markdown('<p style="font-size:11px; font-weight:700; margin-bottom:2px;">Opex — current team (k€/mois)</p>', unsafe_allow_html=True)
+            st.number_input("opex_current_input", min_value=0.0, max_value=1000.0,
+                            value=float(st.session_state.get("opex_current_k", 80.0)),
+                            step=1.0, label_visibility="collapsed", key="opex_current_k")
+            st.markdown('<p style="font-size:10px; opacity:0.6; margin-top:2px;">Salaires, bureaux, outils</p>', unsafe_allow_html=True)
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
     # =========================
     # RIGHT
     # =========================
@@ -567,73 +615,14 @@ else:
     st.markdown("#### P&L — Cascade mensuelle")
 
     # --------------------------------------------------
-    # ⚙️ Cost inputs FIRST (above table)
-    # --------------------------------------------------
-    with st.expander("⚙️  Paramétrer les coûts variables & fixes", expanded=True):
-        pnl_col1, pnl_col2, pnl_col3, pnl_col4 = st.columns(4, gap="large")
-
-        # --- COGS: per client served (active borrowers this month)
-        with pnl_col1:
-            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">COGS / client servi (€)</p>', unsafe_allow_html=True)
-            st.number_input("cogs_per_client_eur_input", min_value=0.0, max_value=500.0,
-                            value=float(st.session_state.get("cogs_per_client_eur", 5.0)),
-                            step=0.5, label_visibility="collapsed", key="cogs_per_client_eur")
-            st.slider("cogs_per_client_slider", min_value=0.0, max_value=100.0,
-                      value=float(st.session_state.get("cogs_per_client_eur", 5.0)),
-                      step=0.5, key="_cogs_per_client_slider", label_visibility="collapsed",
-                      on_change=lambda: st.session_state.update({"cogs_per_client_eur": st.session_state["_cogs_per_client_slider"]}))
-            st.markdown('<p style="font-size:11px; opacity:0.6; margin-top:2px;">Infra, data, support par client actif</p>', unsafe_allow_html=True)
-
-        # --- CAC: per new client acquired — derived from growth slider
-        with pnl_col2:
-            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">CAC / nouveau client (€)</p>', unsafe_allow_html=True)
-            st.number_input("cac_per_new_client_eur_input", min_value=0.0, max_value=5000.0,
-                            value=float(st.session_state.get("cac_per_new_client_eur", 30.0)),
-                            step=1.0, label_visibility="collapsed", key="cac_per_new_client_eur")
-            st.slider("cac_per_new_client_slider", min_value=0.0, max_value=500.0,
-                      value=float(st.session_state.get("cac_per_new_client_eur", 30.0)),
-                      step=1.0, key="_cac_per_new_client_slider", label_visibility="collapsed",
-                      on_change=lambda: st.session_state.update({"cac_per_new_client_eur": st.session_state["_cac_per_new_client_slider"]}))
-            st.markdown('<p style="font-size:11px; opacity:0.6; margin-top:2px;">Marketing, sales, onboarding</p>', unsafe_allow_html=True)
-
-        # --- Growth period → derive new clients/month
-        with pnl_col3:
-            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">Horizon de croissance (mois)</p>', unsafe_allow_html=True)
-            st.markdown('<p style="font-size:11px; opacity:0.6; margin-bottom:4px;">Base : 500 clients aujourd\'hui</p>', unsafe_allow_html=True)
-            st.slider("growth_months_slider", min_value=1, max_value=36,
-                      value=int(st.session_state.get("growth_months", 12)),
-                      step=1, key="growth_months", label_visibility="collapsed")
-            target_clients = nb_clients_per_month  # target = clients needed/month at given volume
-            base_clients = 500.0
-            growth_months = int(st.session_state.get("growth_months", 12))
-            new_clients_per_month = max(0.0, (target_clients - base_clients) / growth_months)
-            st.markdown(
-                f'<p style="font-size:11px; margin-top:4px;">→ <b>{new_clients_per_month:,.0f} nouveaux clients/mois</b> pour atteindre {target_clients:,.0f} en {growth_months} mois</p>',
-                unsafe_allow_html=True,
-            )
-
-        # --- Opex: current team only (improved slider removed)
-        with pnl_col4:
-            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px;">Opex — current team (k€/mois)</p>', unsafe_allow_html=True)
-            st.number_input("opex_current_input", min_value=0.0, max_value=1000.0,
-                            value=float(st.session_state.get("opex_current_k", 80.0)),
-                            step=1.0, label_visibility="collapsed", key="opex_current_k")
-            st.markdown('<p style="font-size:12px; font-weight:700; margin-bottom:2px; margin-top:8px;">Opex — improved team (k€/mois)</p>', unsafe_allow_html=True)
-            st.number_input("opex_improved_input", min_value=0.0, max_value=1000.0,
-                            value=float(st.session_state.get("opex_improved_k", 60.0)),
-                            step=1.0, label_visibility="collapsed", key="opex_improved_k")
-            st.markdown('<p style="font-size:11px; opacity:0.6; margin-top:2px;">Salaires, bureaux, outils</p>', unsafe_allow_html=True)
-
-    # --------------------------------------------------
     # Compute derived P&L values
     # --------------------------------------------------
     cogs_per_client_eur = float(st.session_state.get("cogs_per_client_eur", 5.0))
     cac_per_new_client_eur = float(st.session_state.get("cac_per_new_client_eur", 30.0))
     opex_current_k = float(st.session_state.get("opex_current_k", 80.0))
-    opex_improved_k = float(st.session_state.get("opex_improved_k", 60.0))
     growth_months = int(st.session_state.get("growth_months", 12))
+    base_clients = 500.0
 
-    # nb_clients_per_month already computed above in RIGHT section
     new_clients_per_month = max(0.0, (nb_clients_per_month - base_clients) / growth_months)
     cogs_k = nb_clients_per_month * cogs_per_client_eur / 1000
     cac_k = new_clients_per_month * cac_per_new_client_eur / 1000
@@ -647,7 +636,6 @@ else:
     cm2_k = cm1_k - risk_cost_k - cogs_k
     cm3_k = cm2_k - cac_k
     ebitda_current_k = cm3_k - opex_current_k
-    ebitda_improved_k = cm3_k - opex_improved_k
 
     def color_val(v):
         c = "#1B5A43" if v >= 0 else "#C0392B"
@@ -674,8 +662,8 @@ else:
               <tr class="pnl-row-margin"><td>CM 2</td><td>{color_val(cm2_k)}</td></tr>
               <tr class="pnl-row-sub"><td>↳ CAC <span style="opacity:0.55;">({new_clients_per_month:,.0f} new × {cac_per_new_client_eur:.0f} €)</span></td><td>{color_val(-cac_k)}</td></tr>
               <tr class="pnl-row-margin"><td>CM 3</td><td>{color_val(cm3_k)}</td></tr>
-              <tr class="pnl-row-sub"><td>↳ Opex — current team</td><td>{color_val(-opex_current_k)}</td></tr>
-              <tr class="pnl-row-sub"><td>↳ Opex — improved team</td><td>{color_val(-opex_improved_k)}</td></tr>
+              <tr class="pnl-row-sub"><td>↳ Opex</td><td>{color_val(-opex_current_k)}</td></tr>
+              <tr class="pnl-row-ebitda"><td>EBITDA</td><td>{color_val(ebitda_current_k)}</td></tr>
             </table>
             """,
             unsafe_allow_html=True,
@@ -683,29 +671,16 @@ else:
 
     with card_col:
         ebitda_cur_color = "#1B5A43" if ebitda_current_k >= 0 else "#C0392B"
-        ebitda_imp_color = "#1B5A43" if ebitda_improved_k >= 0 else "#C0392B"
-        delta_k = ebitda_improved_k - ebitda_current_k
-        delta_color = "#1B5A43" if delta_k >= 0 else "#C0392B"
 
         st.markdown(
             f"""
-            <p style="font-size:12px; font-weight:700; margin-bottom:6px;">EBITDA — comparaison équipes</p>
+            <p style="font-size:11px; font-weight:700; margin-bottom:6px;">EBITDA — current team</p>
             <div style="display:flex; gap:12px; margin-top:4px;">
               <div class="cost-card">
                 <div class="cc-title">Current team</div>
                 <div class="cc-value" style="color:{ebitda_cur_color};">{ebitda_current_k:+,.1f} k€</div>
                 <div class="cc-sub">Opex = {opex_current_k:,.0f} k€/mois</div>
               </div>
-              <div class="cost-card improved">
-                <div class="cc-title">Improved — EoY 2026</div>
-                <div class="cc-value" style="color:{ebitda_imp_color};">{ebitda_improved_k:+,.1f} k€</div>
-                <div class="cc-sub">Opex = {opex_improved_k:,.0f} k€/mois</div>
-              </div>
-            </div>
-            <div style="margin-top:8px; padding:8px 12px; border-radius:8px;
-                        background:rgba(0,0,0,0.04); font-size:12px;">
-              Gain potentiel : <span style="font-weight:800; color:{delta_color};">{delta_k:+,.1f} k€/mois</span>
-              via optimisation Opex ({opex_current_k - opex_improved_k:,.0f} k€ d'écart)
             </div>
             """,
             unsafe_allow_html=True,
@@ -713,17 +688,16 @@ else:
 
         # Cascade bar chart
         cascade_data = pd.DataFrame({
-            "Étape": ["CM 1", "CM 2", "CM 3", "EBITDA\n(current)", "EBITDA\n(improved)"],
-            "Valeur": [cm1_k, cm2_k, cm3_k, ebitda_current_k, ebitda_improved_k],
+            "Étape": ["CM 1", "CM 2", "CM 3", "EBITDA"],
+            "Valeur": [cm1_k, cm2_k, cm3_k, ebitda_current_k],
             "Couleur": [
                 "pos" if cm1_k >= 0 else "neg",
                 "pos" if cm2_k >= 0 else "neg",
                 "pos" if cm3_k >= 0 else "neg",
                 "pos" if ebitda_current_k >= 0 else "neg",
-                "imp" if ebitda_improved_k >= 0 else "neg",
             ],
         })
-        color_scale_cascade = alt.Scale(domain=["pos", "neg", "imp"], range=["#064C72", "#F83131", "#1B5A43"])
+        color_scale_cascade = alt.Scale(domain=["pos", "neg"], range=["#064C72", "#F83131"])
         cascade_chart = (
             alt.Chart(cascade_data)
             .mark_bar(cornerRadiusTopLeft=4, cornerRadiusTopRight=4, cornerRadiusBottomLeft=4, cornerRadiusBottomRight=4)
